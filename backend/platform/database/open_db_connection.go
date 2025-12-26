@@ -5,6 +5,7 @@ import (
 
 	"github.com/create-go-app/fiber-go-template/app/queries"
 	"github.com/jmoiron/sqlx"
+	"gorm.io/gorm"
 )
 
 // Queries struct for collect all app queries.
@@ -15,12 +16,13 @@ type Queries struct {
 	*queries.TaskHistoryQueries // load queries from TaskHistory model
 }
 
-// OpenDBConnection func for opening database connection.
+// OpenDBConnection func for opening database connection with GORM for TaskQueries.
 func OpenDBConnection() (*Queries, error) {
 	// Define Database connection variables.
 	var (
-		db  *sqlx.DB
-		err error
+		db     *sqlx.DB
+		gormDB *gorm.DB
+		err    error
 	)
 
 	// Get DB_TYPE value from .env file.
@@ -30,8 +32,14 @@ func OpenDBConnection() (*Queries, error) {
 	switch dbType {
 	case "pgx":
 		db, err = PostgreSQLConnection()
+		if err == nil {
+			gormDB, err = GORMPostgreSQLConnection()
+		}
 	case "mysql":
 		db, err = MysqlConnection()
+		if err == nil {
+			gormDB, err = GORMMysqlConnection()
+		}
 	}
 
 	if err != nil {
@@ -42,7 +50,23 @@ func OpenDBConnection() (*Queries, error) {
 		// Set queries from models:
 		UserQueries:        &queries.UserQueries{DB: db},        // from User model
 		BookQueries:        &queries.BookQueries{DB: db},        // from Book model
-		TaskQueries:        &queries.TaskQueries{DB: db},        // from Task model
+		TaskQueries:        &queries.TaskQueries{DB: gormDB},    // from Task model (using GORM)
 		TaskHistoryQueries: &queries.TaskHistoryQueries{DB: db}, // from TaskHistory model
 	}, nil
+}
+
+// OpenGORMDBConnection func for opening GORM database connection.
+func OpenGORMDBConnection() (*gorm.DB, error) {
+	// Get DB_TYPE value from .env file.
+	dbType := os.Getenv("DB_TYPE")
+
+	// Define a new GORM Database connection with right DB type.
+	switch dbType {
+	case "pgx":
+		return GORMPostgreSQLConnection()
+	case "mysql":
+		return GORMMysqlConnection()
+	default:
+		return GORMPostgreSQLConnection() // default to PostgreSQL
+	}
 }

@@ -47,6 +47,10 @@ func GetTasks(c *fiber.Ctx) error {
 // GetTask func gets task by ID.
 // @Tags Task
 // @Security ApiKeyAuth
+// @Param id path string true "Task ID"
+// @Accept json
+// @Produce json
+// @Success 200 {object} dto.TaskRes
 // @Router /v1/task/{id} [get]
 func GetTask(c *fiber.Ctx) error {
 	id, err := uuid.Parse(c.Params("id"))

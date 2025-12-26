@@ -15,8 +15,6 @@ type Task struct {
 	CreatedBy  uuid.UUID `db:"created_by" json:"created_by"`
 	AssignedTo uuid.UUID `db:"assigned_to" json:"assigned_to"`
 
-	Meta map[string]interface{} `db:"meta" json:"meta,omitempty"`
-
 	CreatedAt time.Time `db:"created_at" json:"created_at"`
 	UpdatedAt time.Time `db:"updated_at" json:"updated_at"`
 }

@@ -12,6 +12,23 @@ definitions:
     required:
     - title
     type: object
+  dto.TaskRes:
+    properties:
+      created_at:
+        type: string
+      created_by:
+        type: string
+      description:
+        type: string
+      id:
+        type: string
+      status:
+        type: string
+      title:
+        type: string
+      updated_at:
+        type: string
+    type: object
   models.Book:
     properties:
       author:
@@ -91,9 +108,6 @@ definitions:
         type: string
       id:
         type: string
-      meta:
-        additionalProperties: true
-        type: object
       status:
         type: string
       title:
@@ -328,7 +342,21 @@ paths:
       - Task
   /v1/task/{id}:
     get:
-      responses: {}
+      consumes:
+      - application/json
+      parameters:
+      - description: Task ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.TaskRes'
       security:
       - ApiKeyAuth: []
       tags:

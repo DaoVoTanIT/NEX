@@ -328,10 +328,32 @@ const docTemplate = `{
                         "ApiKeyAuth": []
                     }
                 ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
                 "tags": [
                     "Task"
                 ],
-                "responses": {}
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Task ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.TaskRes"
+                        }
+                    }
+                }
             }
         },
         "/v1/tasks": {
@@ -520,6 +542,32 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.TaskRes": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "created_by": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
         "models.Book": {
             "type": "object",
             "required": [
@@ -631,10 +679,6 @@ const docTemplate = `{
                 },
                 "id": {
                     "type": "string"
-                },
-                "meta": {
-                    "type": "object",
-                    "additionalProperties": true
                 },
                 "status": {
                     "type": "string"
