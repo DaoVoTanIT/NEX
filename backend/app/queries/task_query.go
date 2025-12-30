@@ -1,86 +1,105 @@
 package queries
 
 import (
-	"github.com/create-go-app/fiber-go-template/app/models"
+	"time"
+
+	entities "github.com/create-go-app/fiber-go-template/app/entities"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
-// TaskQueries struct for queries from Task model using GORM.
 type TaskQueries struct {
 	*gorm.DB
 }
 
-// GetTasks method for getting all tasks.
-func (q *TaskQueries) GetTasks() ([]models.Task, error) {
-	// Define tasks variable.
-	var tasks []models.Task
+// =========================
+// GET LIST TASKS
+// =========================
+func (q *TaskQueries) GetTasks() ([]entities.Task, error) {
+	var tasks []entities.Task
 
-	// Use GORM to find all tasks
-	err := q.Find(&tasks).Error
+	err := q.
+		Preload("Creator").
+		Preload("Assignee").
+		Order("created_at DESC").
+		Find(&tasks).Error
+
 	if err != nil {
-		// Return empty slice and error.
-		return tasks, err
+		return nil, err
 	}
 
-	// Return query result.
 	return tasks, nil
 }
 
-// GetTask method for getting one task by given ID.
-func (q *TaskQueries) GetTask(id uuid.UUID) (models.Task, error) {
-	// Define task variable.
-	var task models.Task
+// =========================
+// GET TASK BY ID
+// =========================
+func (q *TaskQueries) GetTask(id uuid.UUID) (entities.Task, error) {
+	var task entities.Task
 
-	// Use GORM to find task by ID
-	err := q.Where("id = ?", id).First(&task).Error
+	err := q.
+		Preload("Creator").
+		Preload("Assignee").
+		First(&task, "id = ?", id).Error
+
 	if err != nil {
-		// Return empty object and error.
-		return task, err
+		return entities.Task{}, err
 	}
 
-	// Return query result.
 	return task, nil
 }
 
-// GetTasksByStatus method for getting all tasks by status.
-func (q *TaskQueries) GetTasksByStatus(status string) ([]models.Task, error) {
-	// Define tasks variable.
-	var tasks []models.Task
+// =========================
+// GET TASKS BY STATUS
+// =========================
+func (q *TaskQueries) GetTasksByStatus(status string) ([]entities.Task, error) {
+	var tasks []entities.Task
 
-	// Use GORM to find tasks by status
-	err := q.Where("status = ?", status).Find(tasks).Error
+	err := q.
+		Where("status = ?", status).
+		Preload("Creator").
+		Preload("Assignee").
+		Order("created_at DESC").
+		Find(&tasks).Error
+
 	if err != nil {
-		// Return empty slice and error.
-		return tasks, err
+		return nil, err
 	}
 
-	// Return query result.
 	return tasks, nil
 }
 
-// CreateTask method for creating task by given Task object.
-func (q *TaskQueries) CreateTask(t *models.Task) error {
-	// Use GORM to create task
-	err := q.Create(t).Error
-	return err
+// =========================
+// CREATE TASK
+// =========================
+func (q *TaskQueries) CreateTask(t *entities.Task) error {
+	now := time.Now()
+	t.ID = uuid.New()
+	t.CreatedAt = now
+	t.UpdatedAt = now
+
+	return q.Create(t).Error
 }
 
-// UpdateTask method for updating task by given Task object.
-func (q *TaskQueries) UpdateTask(id uuid.UUID, t *models.Task) error {
-	// Use GORM to update specific fields of the task
-	err := q.Model(&models.Task{}).Where("id = ?", id).Updates(map[string]interface{}{
-		"title":      t.Title,
-		"status":     t.Status,
-		"updated_at": t.UpdatedAt,
-	}).Error
-
-	return err
+// =========================
+// UPDATE TASK
+// =========================
+func (q *TaskQueries) UpdateTask(id uuid.UUID, t *entities.Task) error {
+	return q.
+		Model(&entities.Task{}).
+		Where("id = ?", id).
+		Updates(map[string]interface{}{
+			"title":       t.Title,
+			"description": t.Description,
+			"status":      t.Status,
+			"assigned_to": t.AssignedTo,
+			"updated_at":  time.Now(),
+		}).Error
 }
 
-// DeleteTask method for delete task by given ID.
+// =========================
+// DELETE TASK
+// =========================
 func (q *TaskQueries) DeleteTask(id uuid.UUID) error {
-	// Use GORM to delete task by ID
-	err := q.Where("id = ?", id).Delete(&models.Task{}).Error
-	return err
+	return q.Delete(&entities.Task{}, "id = ?", id).Error
 }

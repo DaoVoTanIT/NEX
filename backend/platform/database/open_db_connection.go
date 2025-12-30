@@ -2,57 +2,64 @@ package database
 
 import (
 	"os"
+	"sync"
 
 	"github.com/create-go-app/fiber-go-template/app/queries"
-	"github.com/jmoiron/sqlx"
 	"gorm.io/gorm"
 )
 
 // Queries struct for collect all app queries.
 type Queries struct {
 	*queries.UserQueries        // load queries from User model
-	*queries.BookQueries        // load queries from Book model
 	*queries.TaskQueries        // load queries from Task model
 	*queries.TaskHistoryQueries // load queries from TaskHistory model
 }
 
+var (
+	queriesOnce      sync.Once
+	queriesInstance  *Queries
+	queriesInitError error
+)
+
 // OpenDBConnection func for opening database connection with GORM for TaskQueries.
 func OpenDBConnection() (*Queries, error) {
-	// Define Database connection variables.
-	var (
-		db     *sqlx.DB
-		gormDB *gorm.DB
-		err    error
-	)
+	queriesOnce.Do(func() {
+		var (
+			gormDB *gorm.DB
+			err    error
+		)
 
-	// Get DB_TYPE value from .env file.
-	dbType := os.Getenv("DB_TYPE")
+		dbType := os.Getenv("DB_TYPE")
 
-	// Define a new Database connection with right DB type.
-	switch dbType {
-	case "pgx":
-		db, err = PostgreSQLConnection()
-		if err == nil {
-			gormDB, err = GORMPostgreSQLConnection()
+		switch dbType {
+		case "pgx":
+			_, err = PostgreSQLConnection()
+			if err == nil {
+				gormDB, err = GORMPostgreSQLConnection()
+			}
+		case "mysql":
+			_, err = MysqlConnection()
+			if err == nil {
+				gormDB, err = GORMMysqlConnection()
+			}
 		}
-	case "mysql":
-		db, err = MysqlConnection()
-		if err == nil {
-			gormDB, err = GORMMysqlConnection()
+
+		if err != nil {
+			queriesInitError = err
+			return
 		}
-	}
 
-	if err != nil {
-		return nil, err
-	}
+		queriesInstance = &Queries{
+			UserQueries:        &queries.UserQueries{DB: gormDB},
+			TaskQueries:        &queries.TaskQueries{DB: gormDB},
+			TaskHistoryQueries: &queries.TaskHistoryQueries{DB: gormDB},
+		}
+	})
 
-	return &Queries{
-		// Set queries from models:
-		UserQueries:        &queries.UserQueries{DB: db},        // from User model
-		BookQueries:        &queries.BookQueries{DB: db},        // from Book model
-		TaskQueries:        &queries.TaskQueries{DB: gormDB},    // from Task model (using GORM)
-		TaskHistoryQueries: &queries.TaskHistoryQueries{DB: db}, // from TaskHistory model
-	}, nil
+	if queriesInitError != nil {
+		return nil, queriesInitError
+	}
+	return queriesInstance, nil
 }
 
 // OpenGORMDBConnection func for opening GORM database connection.

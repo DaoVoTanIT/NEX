@@ -1,95 +1,70 @@
 package queries
 
 import (
-	"github.com/create-go-app/fiber-go-template/app/models"
+	models "github.com/create-go-app/fiber-go-template/app/entities"
 	"github.com/google/uuid"
-	"github.com/jmoiron/sqlx"
+	"gorm.io/gorm"
 )
 
-// TaskHistoryQueries struct for queries from TaskHistory model.
 type TaskHistoryQueries struct {
-	*sqlx.DB
+	*gorm.DB
 }
 
-// GetTaskHistories method for getting all task histories.
+// =========================
+// GET ALL TASK HISTORIES
+// =========================
 func (q *TaskHistoryQueries) GetTaskHistories() ([]models.TaskHistory, error) {
-	// Define histories variable.
-	histories := []models.TaskHistory{}
+	var histories []models.TaskHistory
 
-	// Define query string.
-	query := `SELECT * FROM task_histories`
+	err := q.
+		Order("created_at DESC").
+		Find(&histories).Error
 
-	// Send query to database.
-	err := q.Select(&histories, query)
 	if err != nil {
-		// Return empty object and error.
-		return histories, err
+		return nil, err
 	}
 
-	// Return query result.
 	return histories, nil
 }
 
-// GetTaskHistoriesByTaskID method for getting histories by task ID.
+// =========================
+// GET TASK HISTORIES BY TASK ID
+// =========================
 func (q *TaskHistoryQueries) GetTaskHistoriesByTaskID(taskID uuid.UUID) ([]models.TaskHistory, error) {
-	// Define histories variable.
-	histories := []models.TaskHistory{}
+	var histories []models.TaskHistory
 
-	// Define query string.
-	query := `SELECT * FROM task_histories WHERE task_id = $1 ORDER BY created_at DESC`
+	err := q.
+		Where("task_id = ?", taskID).
+		Order("created_at DESC").
+		Find(&histories).Error
 
-	// Send query to database.
-	err := q.Select(&histories, query, taskID)
 	if err != nil {
-		// Return empty object and error.
-		return histories, err
+		return nil, err
 	}
 
-	// Return query result.
 	return histories, nil
 }
 
-// GetTaskHistory method for getting one task history by ID.
+// =========================
+// GET TASK HISTORY BY ID
+// =========================
 func (q *TaskHistoryQueries) GetTaskHistory(id uuid.UUID) (models.TaskHistory, error) {
-	// Define history variable.
-	history := models.TaskHistory{}
+	var history models.TaskHistory
 
-	// Define query string.
-	query := `SELECT * FROM task_histories WHERE id = $1`
+	err := q.
+		Where("id = ?", id).
+		First(&history).Error
 
-	// Send query to database.
-	err := q.Get(&history, query, id)
 	if err != nil {
-		// Return empty object and error.
 		return history, err
 	}
 
-	// Return query result.
 	return history, nil
 }
 
-// CreateTaskHistory method for creating task history by given TaskHistory object.
+// =========================
+// CREATE TASK HISTORY
+// =========================
 func (q *TaskHistoryQueries) CreateTaskHistory(h *models.TaskHistory) error {
-	// Define query string.
-	query := `
-		INSERT INTO task_histories 
-		VALUES ($1, $2, $3, $4, $5)
-	`
-
-	// Send query to database.
-	_, err := q.Exec(
-		query,
-		h.ID,
-		h.TaskID,
-		h.Action,
-		h.CreatedBy,
-		h.CreatedAt,
-	)
-	if err != nil {
-		// Return only error.
-		return err
-	}
-
-	// This query returns nothing.
-	return nil
+	return q.Create(h).Error
 }
