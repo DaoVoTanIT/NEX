@@ -1,15 +1,31 @@
 package routes
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
+	"github.com/create-go-app/fiber-go-template/app/controllers"
+	models "github.com/create-go-app/fiber-go-template/app/entities"
+	"github.com/create-go-app/fiber-go-template/pkg/core"
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 	"github.com/joho/godotenv"
 	"github.com/stretchr/testify/assert"
 )
+
+type stubAuthService struct{}
+
+func (s *stubAuthService) SignUp(ctx context.Context, input *models.SignUp) (*core.ApiResponse, error) {
+	return core.Success(200, "ok", nil, nil), nil
+}
+func (s *stubAuthService) SignIn(ctx context.Context, input *models.SignIn) (*core.ApiResponse, error) {
+	return core.Success(200, "ok", nil, nil), nil
+}
+func (s *stubAuthService) SignOut(ctx context.Context, c any) (*core.ApiResponse, error) {
+	return core.Success(204, "signed out", nil, nil), nil
+}
 
 func TestPublicRoutes(t *testing.T) {
 	// Load .env.test file from the root folder
@@ -34,15 +50,18 @@ func TestPublicRoutes(t *testing.T) {
 			description:   "get book by invalid ID (non UUID)",
 			route:         "/api/v1/book/123456",
 			expectedError: false,
-			expectedCode:  500,
+			expectedCode:  404,
 		},
 	}
 
 	// Define Fiber app.
 	app := fiber.New()
 
+	// Create stub auth service and controller
+	authCtrl := controllers.NewAuthController(&stubAuthService{})
+
 	// Define routes.
-	PublicRoutes(app)
+	PublicRoutes(app, authCtrl)
 
 	// Iterate through test single test cases
 	for _, test := range tests {

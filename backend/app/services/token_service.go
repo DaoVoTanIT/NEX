@@ -4,16 +4,27 @@ import (
 	"context"
 	"time"
 
+	"github.com/create-go-app/fiber-go-template/app/interfaces/repositories"
+	"github.com/create-go-app/fiber-go-template/app/interfaces/services"
 	"github.com/create-go-app/fiber-go-template/pkg/core"
 	"github.com/create-go-app/fiber-go-template/pkg/utils"
 	"github.com/create-go-app/fiber-go-template/platform/cache"
-	"github.com/create-go-app/fiber-go-template/platform/database"
 	"github.com/gofiber/fiber/v2"
 )
 
-type DefaultTokenService struct{}
+type TokenServiceImpl struct {
+	userRepo     repositories.UserRepository
+	cacheService *cache.CacheService
+}
 
-func (s *DefaultTokenService) Renew(ctx context.Context, c any, refreshToken string) (*core.ApiResponse, error) {
+func NewTokenService(userRepo repositories.UserRepository, cacheService *cache.CacheService) services.TokenService {
+	return &TokenServiceImpl{
+		userRepo:     userRepo,
+		cacheService: cacheService,
+	}
+}
+
+func (s *TokenServiceImpl) Renew(ctx context.Context, c any, refreshToken string) (*core.ApiResponse, error) {
 	now := time.Now().Unix()
 
 	expiresRefreshToken, err := utils.ParseRefreshToken(refreshToken)
@@ -33,12 +44,7 @@ func (s *DefaultTokenService) Renew(ctx context.Context, c any, refreshToken str
 
 	userID := claims.UserID
 
-	db, err := database.OpenDBConnection()
-	if err != nil {
-		return core.Error(500, "database error", err.Error(), nil), nil
-	}
-
-	user, err := db.GetUserByID(userID)
+	user, err := s.userRepo.GetUserByID(ctx, userID)
 	if err != nil {
 		return core.Error(404, "user not found", err.Error(), nil), nil
 	}
@@ -53,12 +59,7 @@ func (s *DefaultTokenService) Renew(ctx context.Context, c any, refreshToken str
 		return core.Error(500, "token generation error", err.Error(), nil), nil
 	}
 
-	connRedis, err := cache.RedisConnection()
-	if err != nil {
-		return core.Error(500, "redis error", err.Error(), nil), nil
-	}
-
-	if err := connRedis.Set(context.Background(), userID.String(), tokens.Refresh, 0).Err(); err != nil {
+	if err := s.cacheService.Set(userID.String(), tokens.Refresh, 0); err != nil {
 		return core.Error(500, "cache token failed", err.Error(), nil), nil
 	}
 

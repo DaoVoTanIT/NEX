@@ -6,23 +6,32 @@ import (
 
 	"github.com/create-go-app/fiber-go-template/app/dto"
 	models "github.com/create-go-app/fiber-go-template/app/entities"
-	genmapper "github.com/create-go-app/fiber-go-template/app/mappers/generated"
+	"github.com/create-go-app/fiber-go-template/app/interfaces/repositories"
+	"github.com/create-go-app/fiber-go-template/app/interfaces/services"
 	"github.com/create-go-app/fiber-go-template/pkg/core"
+	genmapper "github.com/create-go-app/fiber-go-template/pkg/mappers/generated"
 	"github.com/create-go-app/fiber-go-template/pkg/repository"
 	"github.com/create-go-app/fiber-go-template/pkg/utils"
-	"github.com/create-go-app/fiber-go-template/platform/database"
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 )
 
-type DefaultTaskService struct{}
+type TaskServiceImpl struct {
+	taskRepo        repositories.TaskRepository
+	taskHistoryRepo repositories.TaskHistoryRepository
+	txManager       repositories.TransactionManager
+}
 
-func (s *DefaultTaskService) GetTasks() (*core.ApiResponse, error) {
-	db, err := database.OpenDBConnection()
-	if err != nil {
-		return core.Error(fiber.StatusInternalServerError, "database error", err.Error(), nil), nil
+func NewTaskService(taskRepo repositories.TaskRepository, taskHistoryRepo repositories.TaskHistoryRepository, txManager repositories.TransactionManager) services.TaskService {
+	return &TaskServiceImpl{
+		taskRepo:        taskRepo,
+		taskHistoryRepo: taskHistoryRepo,
+		txManager:       txManager,
 	}
-	tasks, err := db.GetTasks()
+}
+
+func (s *TaskServiceImpl) GetTasks(ctx context.Context) (*core.ApiResponse, error) {
+	tasks, err := s.taskRepo.GetTasks(ctx)
 	if err != nil {
 		return core.Error(fiber.StatusNotFound, "tasks not found", err.Error(), fiber.Map{
 			"count": 0,
@@ -33,16 +42,12 @@ func (s *DefaultTaskService) GetTasks() (*core.ApiResponse, error) {
 	return core.Success(fiber.StatusOK, "ok", res, nil), nil
 }
 
-func (s *DefaultTaskService) GetTask(id string) (*core.ApiResponse, error) {
-	db, err := database.OpenDBConnection()
-	if err != nil {
-		return core.Error(fiber.StatusInternalServerError, "database error", err.Error(), nil), nil
-	}
+func (s *TaskServiceImpl) GetTask(ctx context.Context, id string) (*core.ApiResponse, error) {
 	uid, err := uuid.Parse(id)
 	if err != nil {
 		return core.Error(fiber.StatusBadRequest, "bad request", err.Error(), nil), nil
 	}
-	task, err := db.GetTask(uid)
+	task, err := s.taskRepo.GetTask(ctx, uid)
 	if err != nil {
 		return core.Error(fiber.StatusNotFound, "task not found", err.Error(), nil), nil
 	}
@@ -51,7 +56,7 @@ func (s *DefaultTaskService) GetTask(id string) (*core.ApiResponse, error) {
 	return core.Success(fiber.StatusOK, "ok", res, nil), nil
 }
 
-func (s *DefaultTaskService) Create(ctx context.Context, c any, req *dto.CreateTaskReq) (*core.ApiResponse, error) {
+func (s *TaskServiceImpl) Create(ctx context.Context, c any, req *dto.CreateTaskReq) (*core.ApiResponse, error) {
 	cc := c.(*fiber.Ctx)
 
 	claims, err := utils.ExtractTokenMetadata(cc)
@@ -72,12 +77,7 @@ func (s *DefaultTaskService) Create(ctx context.Context, c any, req *dto.CreateT
 	taskEntity.CreatedAt = time.Now()
 	task := &taskEntity
 
-	db, err := database.OpenDBConnection()
-	if err != nil {
-		return core.Error(fiber.StatusInternalServerError, "database error", err.Error(), nil), nil
-	}
-
-	if err := db.CreateTask(task); err != nil {
+	if err := s.taskRepo.CreateTask(ctx, task); err != nil {
 		return core.Error(fiber.StatusInternalServerError, "create task failed", err.Error(), nil), nil
 	}
 
@@ -85,7 +85,7 @@ func (s *DefaultTaskService) Create(ctx context.Context, c any, req *dto.CreateT
 	return core.Success(fiber.StatusOK, "ok", res, nil), nil
 }
 
-func (s *DefaultTaskService) Update(ctx context.Context, c any, task *models.Task) (*core.ApiResponse, error) {
+func (s *TaskServiceImpl) Update(ctx context.Context, c any, task *models.Task) (*core.ApiResponse, error) {
 	cc := c.(*fiber.Ctx)
 
 	now := time.Now().Unix()
@@ -101,12 +101,7 @@ func (s *DefaultTaskService) Update(ctx context.Context, c any, task *models.Tas
 		return core.Error(fiber.StatusForbidden, "permission denied", nil, nil), nil
 	}
 
-	db, err := database.OpenDBConnection()
-	if err != nil {
-		return core.Error(fiber.StatusInternalServerError, "database error", err.Error(), nil), nil
-	}
-
-	oldTask, err := db.GetTask(task.ID)
+	oldTask, err := s.taskRepo.GetTask(ctx, task.ID)
 	if err != nil {
 		return core.Error(fiber.StatusNotFound, "task not found", err.Error(), nil), nil
 	}
@@ -117,22 +112,26 @@ func (s *DefaultTaskService) Update(ctx context.Context, c any, task *models.Tas
 
 	task.UpdatedAt = time.Now()
 
-	if err := db.UpdateTask(task.ID, task); err != nil {
+	if err := s.txManager.Do(ctx, func(ctx context.Context) error {
+		if err := s.taskRepo.UpdateTask(ctx, task.ID, task); err != nil {
+			return err
+		}
+
+		return s.taskHistoryRepo.CreateTaskHistory(ctx, &models.TaskHistory{
+			ID:        uuid.New(),
+			TaskID:    task.ID,
+			Action:    "update",
+			CreatedBy: claims.UserID,
+			CreatedAt: time.Now(),
+		})
+	}); err != nil {
 		return core.Error(fiber.StatusInternalServerError, "update failed", err.Error(), nil), nil
 	}
-
-	_ = db.CreateTaskHistory(&models.TaskHistory{
-		ID:        uuid.New(),
-		TaskID:    task.ID,
-		Action:    "update",
-		CreatedBy: claims.UserID,
-		CreatedAt: time.Now(),
-	})
 
 	return core.Success(201, "updated", nil, nil), nil
 }
 
-func (s *DefaultTaskService) Delete(ctx context.Context, c any, id string) (*core.ApiResponse, error) {
+func (s *TaskServiceImpl) Delete(ctx context.Context, c any, id string) (*core.ApiResponse, error) {
 	cc := c.(*fiber.Ctx)
 
 	now := time.Now().Unix()
@@ -148,17 +147,12 @@ func (s *DefaultTaskService) Delete(ctx context.Context, c any, id string) (*cor
 		return core.Error(fiber.StatusForbidden, "permission denied", nil, nil), nil
 	}
 
-	db, err := database.OpenDBConnection()
-	if err != nil {
-		return core.Error(fiber.StatusInternalServerError, "database error", err.Error(), nil), nil
-	}
-
 	uid, err := uuid.Parse(id)
 	if err != nil {
 		return core.Error(fiber.StatusBadRequest, "bad request", err.Error(), nil), nil
 	}
 
-	oldTask, err := db.GetTask(uid)
+	oldTask, err := s.taskRepo.GetTask(ctx, uid)
 	if err != nil {
 		return core.Error(fiber.StatusNotFound, "task not found", err.Error(), nil), nil
 	}
@@ -167,17 +161,21 @@ func (s *DefaultTaskService) Delete(ctx context.Context, c any, id string) (*cor
 		return core.Error(fiber.StatusForbidden, "only creator can delete", nil, nil), nil
 	}
 
-	if err := db.DeleteTask(uid); err != nil {
+	if err := s.txManager.Do(ctx, func(ctx context.Context) error {
+		if err := s.taskRepo.DeleteTask(ctx, uid); err != nil {
+			return err
+		}
+
+		return s.taskHistoryRepo.CreateTaskHistory(ctx, &models.TaskHistory{
+			ID:        uuid.New(),
+			TaskID:    uid,
+			Action:    "delete",
+			CreatedBy: claims.UserID,
+			CreatedAt: time.Now(),
+		})
+	}); err != nil {
 		return core.Error(fiber.StatusInternalServerError, "delete failed", err.Error(), nil), nil
 	}
-
-	_ = db.CreateTaskHistory(&models.TaskHistory{
-		ID:        uuid.New(),
-		TaskID:    uid,
-		Action:    "delete",
-		CreatedBy: claims.UserID,
-		CreatedAt: time.Now(),
-	})
 
 	return core.Success(fiber.StatusNoContent, "deleted", nil, nil), nil
 }

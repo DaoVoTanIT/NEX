@@ -2,24 +2,32 @@ package services
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	"github.com/create-go-app/fiber-go-template/pkg/core"
 	"github.com/gofiber/fiber/v2"
 
 	models "github.com/create-go-app/fiber-go-template/app/entities"
+	"github.com/create-go-app/fiber-go-template/app/interfaces/repositories"
+	"github.com/create-go-app/fiber-go-template/app/interfaces/services"
 	"github.com/create-go-app/fiber-go-template/pkg/utils"
 	"github.com/create-go-app/fiber-go-template/platform/cache"
-	"github.com/create-go-app/fiber-go-template/platform/database"
 	"github.com/google/uuid"
 )
 
-var ErrUnauthorized = errors.New("unauthorized")
+type AuthServiceImpl struct {
+	userRepo     repositories.UserRepository
+	cacheService *cache.CacheService
+}
 
-type DefaultAuthService struct{}
+func NewAuthService(userRepo repositories.UserRepository, cacheService *cache.CacheService) services.AuthService {
+	return &AuthServiceImpl{
+		userRepo:     userRepo,
+		cacheService: cacheService,
+	}
+}
 
-func (s *DefaultAuthService) SignUp(ctx context.Context, input *models.SignUp) (*core.ApiResponse, error) {
+func (s *AuthServiceImpl) SignUp(ctx context.Context, input *models.SignUp) (*core.ApiResponse, error) {
 	validate := utils.NewValidator()
 	if err := validate.Struct(input); err != nil {
 		return core.Error(400, "validation error", utils.ValidatorErrors(err), nil), nil
@@ -28,11 +36,6 @@ func (s *DefaultAuthService) SignUp(ctx context.Context, input *models.SignUp) (
 	role, err := utils.VerifyRole(input.UserRole)
 	if err != nil {
 		return core.Error(400, "invalid role", err.Error(), nil), nil
-	}
-
-	db, err := database.OpenDBConnection()
-	if err != nil {
-		return core.Error(500, "database error", err.Error(), nil), nil
 	}
 
 	user := &models.User{
@@ -49,7 +52,7 @@ func (s *DefaultAuthService) SignUp(ctx context.Context, input *models.SignUp) (
 		return core.Error(400, "validation error", utils.ValidatorErrors(err), nil), nil
 	}
 
-	if err := db.CreateUser(user); err != nil {
+	if err := s.userRepo.CreateUser(ctx, user); err != nil {
 		return core.Error(500, "create user failed", err.Error(), nil), nil
 	}
 
@@ -57,18 +60,13 @@ func (s *DefaultAuthService) SignUp(ctx context.Context, input *models.SignUp) (
 	return core.Success(200, "ok", user, nil), nil
 }
 
-func (s *DefaultAuthService) SignIn(ctx context.Context, input *models.SignIn) (*core.ApiResponse, error) {
+func (s *AuthServiceImpl) SignIn(ctx context.Context, input *models.SignIn) (*core.ApiResponse, error) {
 	validate := utils.NewValidator()
 	if err := validate.Struct(input); err != nil {
 		return core.Error(400, "validation error", utils.ValidatorErrors(err), nil), nil
 	}
 
-	db, err := database.OpenDBConnection()
-	if err != nil {
-		return core.Error(500, "database error", err.Error(), nil), nil
-	}
-
-	user, err := db.GetUserByEmail(input.Email)
+	user, err := s.userRepo.GetUserByEmail(ctx, input.Email)
 	if err != nil {
 		return core.Error(404, "user not found", err.Error(), nil), nil
 	}
@@ -87,19 +85,7 @@ func (s *DefaultAuthService) SignIn(ctx context.Context, input *models.SignIn) (
 		return core.Error(500, "token generation error", err.Error(), nil), nil
 	}
 
-	connRedis, err := cache.RedisConnection()
-	if err != nil {
-		return core.Error(500, "redis error", err.Error(), nil), nil
-	}
-
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	/*
-		Sau 10s → Redis chưa trả kết quả → tự động cancel
-		Go-redis sẽ dừng retry + return error
-	*/
-	defer cancel()
-
-	if err := connRedis.Set(ctx, user.ID.String(), tokens.Refresh, 0).Err(); err != nil {
+	if err := s.cacheService.Set(user.ID.String(), tokens.Refresh, 0); err != nil {
 		return core.Error(500, "cache token failed", err.Error(), nil), nil
 	}
 
@@ -109,20 +95,14 @@ func (s *DefaultAuthService) SignIn(ctx context.Context, input *models.SignIn) (
 	}, nil), nil
 }
 
-func (s *DefaultAuthService) SignOut(ctx context.Context, c any) (*core.ApiResponse, error) {
+func (s *AuthServiceImpl) SignOut(ctx context.Context, c any) (*core.ApiResponse, error) {
 	cc := c.(*fiber.Ctx)
 	claims, err := utils.ExtractTokenMetadata(cc)
 	if err != nil {
 		return core.Error(500, "token parse error", err.Error(), nil), nil
 	}
 
-	connRedis, err := cache.RedisConnection()
-	if err != nil {
-		return core.Error(500, "redis error", err.Error(), nil), nil
-	}
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-	if err := connRedis.Del(ctx, claims.UserID.String()).Err(); err != nil {
+	if err := s.cacheService.Delete(claims.UserID.String()); err != nil {
 		return core.Error(500, "invalidate token failed", err.Error(), nil), nil
 	}
 	return core.Success(204, "signed out", nil, nil), nil

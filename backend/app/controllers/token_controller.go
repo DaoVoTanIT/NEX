@@ -2,11 +2,19 @@ package controllers
 
 import (
 	models "github.com/create-go-app/fiber-go-template/app/entities"
-	"github.com/create-go-app/fiber-go-template/app/services"
+	"github.com/create-go-app/fiber-go-template/app/interfaces/services"
 	"github.com/create-go-app/fiber-go-template/pkg/core"
 
 	"github.com/gofiber/fiber/v2"
 )
+
+type TokenController struct {
+	tokenService services.TokenService
+}
+
+func NewTokenController(tokenService services.TokenService) *TokenController {
+	return &TokenController{tokenService: tokenService}
+}
 
 // RenewTokens method for renew access and refresh tokens.
 // @Description Renew access and refresh tokens.
@@ -18,7 +26,7 @@ import (
 // @Success 200 {string} status "ok"
 // @Security ApiKeyAuth
 // @Router /v1/token/renew [post]
-func RenewTokens(c *fiber.Ctx) error {
+func (ctl *TokenController) RenewTokens(c *fiber.Ctx) error {
 	// Create a new renew refresh token struct.
 	renew := &models.Renew{}
 
@@ -27,7 +35,7 @@ func RenewTokens(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(core.Error(400, "bad request", err.Error(), nil))
 	}
 
-	resp, err := (&services.DefaultTokenService{}).Renew(c.Context(), c, renew.RefreshToken)
+	resp, err := ctl.tokenService.Renew(c.Context(), c, renew.RefreshToken)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(core.Error(500, "internal error", err.Error(), nil))
 	}

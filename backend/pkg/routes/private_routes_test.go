@@ -1,17 +1,60 @@
 package routes
 
 import (
+	"context"
 	"io"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 
+	"github.com/create-go-app/fiber-go-template/app/controllers"
+	"github.com/create-go-app/fiber-go-template/app/dto"
+	models "github.com/create-go-app/fiber-go-template/app/entities"
+	"github.com/create-go-app/fiber-go-template/pkg/core"
+	"github.com/create-go-app/fiber-go-template/pkg/middleware"
 	"github.com/create-go-app/fiber-go-template/pkg/utils"
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 	"github.com/joho/godotenv"
 	"github.com/stretchr/testify/assert"
 )
+
+type authStub struct{}
+
+func (s *authStub) SignUp(ctx context.Context, input *models.SignUp) (*core.ApiResponse, error) {
+	return core.Success(200, "ok", nil, nil), nil
+}
+func (s *authStub) SignIn(ctx context.Context, input *models.SignIn) (*core.ApiResponse, error) {
+	return core.Success(200, "ok", nil, nil), nil
+}
+func (s *authStub) SignOut(ctx context.Context, c any) (*core.ApiResponse, error) {
+	return core.Success(204, "signed out", nil, nil), nil
+}
+
+type tokenStub struct{}
+
+func (s *tokenStub) Renew(ctx context.Context, c any, refreshToken string) (*core.ApiResponse, error) {
+	return core.Success(200, "ok", nil, nil), nil
+}
+
+type taskStub struct{}
+
+func (s *taskStub) GetTasks(ctx context.Context) (*core.ApiResponse, error) {
+	return core.Success(200, "ok", []dto.TaskRes{}, nil), nil
+}
+func (s *taskStub) GetTask(ctx context.Context, id string) (*core.ApiResponse, error) {
+	return core.Success(200, "ok", dto.TaskRes{}, nil), nil
+}
+func (s *taskStub) Create(ctx context.Context, c any, req *dto.CreateTaskReq) (*core.ApiResponse, error) {
+	return core.Success(200, "ok", nil, nil), nil
+}
+func (s *taskStub) Update(ctx context.Context, c any, task *models.Task) (*core.ApiResponse, error) {
+	return core.Success(201, "updated", nil, nil), nil
+}
+func (s *taskStub) Delete(ctx context.Context, c any, id string) (*core.ApiResponse, error) {
+	return core.Success(204, "deleted", nil, nil), nil
+}
 
 func TestPrivateRoutes(t *testing.T) {
 	// Load .env.test file from the root folder.
@@ -51,22 +94,22 @@ func TestPrivateRoutes(t *testing.T) {
 		expectedCode  int
 	}{
 		{
-			description:   "delete book without JWT and body",
+			description:   "delete book without JWT and body (route missing)",
 			route:         "/api/v1/book",
 			method:        "DELETE",
 			tokenString:   "",
 			body:          nil,
 			expectedError: false,
-			expectedCode:  400,
+			expectedCode:  404,
 		},
 		{
-			description:   "delete book without right credentials",
+			description:   "delete book without right credentials (route missing)",
 			route:         "/api/v1/book",
 			method:        "DELETE",
 			tokenString:   "Bearer " + tokenNoAccess.Access,
 			body:          strings.NewReader(dataString),
 			expectedError: false,
-			expectedCode:  403,
+			expectedCode:  404,
 		},
 		{
 			description:   "delete book with credentials",
@@ -83,7 +126,13 @@ func TestPrivateRoutes(t *testing.T) {
 	app := fiber.New()
 
 	// Define routes.
-	PrivateRoutes(app)
+	authCtrl := controllers.NewAuthController(&authStub{})
+	tokenCtrl := controllers.NewTokenController(&tokenStub{})
+	taskCtrl := controllers.NewTaskController(&taskStub{})
+	jwtMiddleware := middleware.NewJWTProtected(middleware.JWTConfig{
+		SecretKey: os.Getenv("JWT_SECRET_KEY"),
+	})
+	PrivateRoutes(app, jwtMiddleware, authCtrl, tokenCtrl, taskCtrl)
 
 	// Iterate through test single test cases
 	for _, test := range tests {
