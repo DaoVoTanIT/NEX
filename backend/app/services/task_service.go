@@ -10,9 +10,7 @@ import (
 	"github.com/create-go-app/fiber-go-template/app/interfaces/services"
 	"github.com/create-go-app/fiber-go-template/pkg/core"
 	genmapper "github.com/create-go-app/fiber-go-template/pkg/mappers/generated"
-	"github.com/create-go-app/fiber-go-template/pkg/repository"
 	"github.com/create-go-app/fiber-go-template/pkg/utils"
-	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 )
 
@@ -33,81 +31,84 @@ func NewTaskService(taskRepo repositories.TaskRepository, taskHistoryRepo reposi
 func (s *TaskServiceImpl) GetTasks(ctx context.Context) (*core.ApiResponse, error) {
 	tasks, err := s.taskRepo.GetTasks(ctx)
 	if err != nil {
-		return core.Error(fiber.StatusNotFound, "tasks not found", err.Error(), fiber.Map{
+		return core.Error(404, "tasks not found", err.Error(), map[string]any{
 			"count": 0,
 		}), nil
 	}
 	mapper := &genmapper.TaskMapperImpl{}
 	res := mapper.EntitiesToResList(tasks)
-	return core.Success(fiber.StatusOK, "ok", res, nil), nil
+	return core.Success(200, "ok", res, nil), nil
 }
 
 func (s *TaskServiceImpl) GetTask(ctx context.Context, id string) (*core.ApiResponse, error) {
 	uid, err := uuid.Parse(id)
 	if err != nil {
-		return core.Error(fiber.StatusBadRequest, "bad request", err.Error(), nil), nil
+		return core.Error(400, "bad request", err.Error(), nil), nil
 	}
 	task, err := s.taskRepo.GetTask(ctx, uid)
 	if err != nil {
-		return core.Error(fiber.StatusNotFound, "task not found", err.Error(), nil), nil
+		return core.Error(404, "task not found", err.Error(), nil), nil
 	}
 	mapper := &genmapper.TaskMapperImpl{}
 	res := mapper.EntityToRes(task)
-	return core.Success(fiber.StatusOK, "ok", res, nil), nil
+	return core.Success(200, "ok", res, nil), nil
 }
 
-func (s *TaskServiceImpl) Create(ctx context.Context, c any, req *dto.CreateTaskReq) (*core.ApiResponse, error) {
-	cc := c.(*fiber.Ctx)
-
-	claims, err := utils.ExtractTokenMetadata(cc)
-	if err != nil {
-		return core.Error(fiber.StatusUnauthorized, "unauthorized", err.Error(), nil), nil
-	}
-
+func (s *TaskServiceImpl) Create(ctx context.Context, userID uuid.UUID, req *dto.CreateTaskReq) (*core.ApiResponse, error) {
 	validate := utils.NewValidator()
 	if err := validate.Struct(req); err != nil {
-		return core.Error(fiber.StatusBadRequest, "validation error", utils.ValidatorErrors(err), nil), nil
+		return core.Error(400, "validation error", utils.ValidatorErrors(err), nil), nil
 	}
 
 	mapper := &genmapper.TaskMapperImpl{}
 	taskEntity := mapper.CreateReqToEntity(*req)
 	taskEntity.ID = uuid.New()
 	taskEntity.Status = "NEW"
-	taskEntity.CreatedBy = claims.UserID
+	taskEntity.CreatedBy = userID
 	taskEntity.CreatedAt = time.Now()
 	task := &taskEntity
 
-	if err := s.taskRepo.CreateTask(ctx, task); err != nil {
-		return core.Error(fiber.StatusInternalServerError, "create task failed", err.Error(), nil), nil
+	// Start a transaction
+	err := s.txManager.Do(ctx, func(ctx context.Context) error {
+		// Create the task
+		if err := s.taskRepo.CreateTask(ctx, task); err != nil {
+			return err
+		}
+
+		// Create the history record after the task is created
+		if err := s.taskHistoryRepo.CreateTaskHistory(ctx, &models.TaskHistory{
+			ID:        uuid.New(),
+			TaskID:    task.ID,
+			Action:    "create",
+			CreatedBy: userID,
+			CreatedAt: time.Now(),
+			OldValue:  "new",
+			NewValue:  "new",
+		}); err != nil {
+			return err
+		}
+
+		// If everything is successful, return nil to commit the transaction
+		return nil
+	})
+
+	// Check for transaction errors
+	if err != nil {
+		return core.Error(500, "create task failed", err.Error(), nil), nil
 	}
 
 	res := mapper.EntityToRes(*task)
-	return core.Success(fiber.StatusOK, "ok", res, nil), nil
+	return core.Success(201, "created", res, nil), nil
 }
 
-func (s *TaskServiceImpl) Update(ctx context.Context, c any, task *models.Task) (*core.ApiResponse, error) {
-	cc := c.(*fiber.Ctx)
-
-	now := time.Now().Unix()
-
-	claims, err := utils.ExtractTokenMetadata(cc)
-	if err != nil {
-		return core.Error(fiber.StatusInternalServerError, "token parse error", err.Error(), nil), nil
-	}
-	if now > claims.Expires {
-		return core.Error(fiber.StatusUnauthorized, "token expired", nil, nil), nil
-	}
-	if !claims.Credentials[repository.TaskUpdateCredential] {
-		return core.Error(fiber.StatusForbidden, "permission denied", nil, nil), nil
-	}
-
+func (s *TaskServiceImpl) Update(ctx context.Context, userID uuid.UUID, task *models.Task) (*core.ApiResponse, error) {
 	oldTask, err := s.taskRepo.GetTask(ctx, task.ID)
 	if err != nil {
-		return core.Error(fiber.StatusNotFound, "task not found", err.Error(), nil), nil
+		return core.Error(404, "task not found", err.Error(), nil), nil
 	}
 
-	if oldTask.CreatedBy != claims.UserID {
-		return core.Error(fiber.StatusForbidden, "only creator can update", nil, nil), nil
+	if oldTask.CreatedBy != userID {
+		return core.Error(403, "only creator can update", nil, nil), nil
 	}
 
 	task.UpdatedAt = time.Now()
@@ -121,44 +122,29 @@ func (s *TaskServiceImpl) Update(ctx context.Context, c any, task *models.Task) 
 			ID:        uuid.New(),
 			TaskID:    task.ID,
 			Action:    "update",
-			CreatedBy: claims.UserID,
+			CreatedBy: userID,
 			CreatedAt: time.Now(),
 		})
 	}); err != nil {
-		return core.Error(fiber.StatusInternalServerError, "update failed", err.Error(), nil), nil
+		return core.Error(500, "update failed", err.Error(), nil), nil
 	}
 
-	return core.Success(201, "updated", nil, nil), nil
+	return core.Success(200, "updated", nil, nil), nil
 }
 
-func (s *TaskServiceImpl) Delete(ctx context.Context, c any, id string) (*core.ApiResponse, error) {
-	cc := c.(*fiber.Ctx)
-
-	now := time.Now().Unix()
-
-	claims, err := utils.ExtractTokenMetadata(cc)
-	if err != nil {
-		return core.Error(fiber.StatusInternalServerError, "token parse error", err.Error(), nil), nil
-	}
-	if now > claims.Expires {
-		return core.Error(fiber.StatusUnauthorized, "token expired", nil, nil), nil
-	}
-	if !claims.Credentials[repository.TaskDeleteCredential] {
-		return core.Error(fiber.StatusForbidden, "permission denied", nil, nil), nil
-	}
-
+func (s *TaskServiceImpl) Delete(ctx context.Context, userID uuid.UUID, id string) (*core.ApiResponse, error) {
 	uid, err := uuid.Parse(id)
 	if err != nil {
-		return core.Error(fiber.StatusBadRequest, "bad request", err.Error(), nil), nil
+		return core.Error(400, "bad request", err.Error(), nil), nil
 	}
 
 	oldTask, err := s.taskRepo.GetTask(ctx, uid)
 	if err != nil {
-		return core.Error(fiber.StatusNotFound, "task not found", err.Error(), nil), nil
+		return core.Error(404, "task not found", err.Error(), nil), nil
 	}
 
-	if oldTask.CreatedBy != claims.UserID {
-		return core.Error(fiber.StatusForbidden, "only creator can delete", nil, nil), nil
+	if oldTask.CreatedBy != userID {
+		return core.Error(403, "only creator can delete", nil, nil), nil
 	}
 
 	if err := s.txManager.Do(ctx, func(ctx context.Context) error {
@@ -170,12 +156,12 @@ func (s *TaskServiceImpl) Delete(ctx context.Context, c any, id string) (*core.A
 			ID:        uuid.New(),
 			TaskID:    uid,
 			Action:    "delete",
-			CreatedBy: claims.UserID,
+			CreatedBy: userID,
 			CreatedAt: time.Now(),
 		})
 	}); err != nil {
-		return core.Error(fiber.StatusInternalServerError, "delete failed", err.Error(), nil), nil
+		return core.Error(500, "delete failed", err.Error(), nil), nil
 	}
 
-	return core.Success(fiber.StatusNoContent, "deleted", nil, nil), nil
+	return core.Success(204, "deleted", nil, nil), nil
 }

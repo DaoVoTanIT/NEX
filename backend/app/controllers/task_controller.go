@@ -6,6 +6,7 @@ import (
 	"github.com/create-go-app/fiber-go-template/app/interfaces/services"
 	"github.com/create-go-app/fiber-go-template/pkg/core"
 	"github.com/gofiber/fiber/v2"
+	"github.com/google/uuid"
 )
 
 type TaskController struct {
@@ -62,7 +63,8 @@ func (ctl *TaskController) CreateTask(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(core.Error(fiber.StatusBadRequest, "bad request", err.Error(), nil))
 	}
 
-	resp, err := ctl.taskService.Create(c.Context(), c, req)
+	userID, _ := c.Locals("userID").(uuid.UUID)
+	resp, err := ctl.taskService.Create(c.Context(), userID, req)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(core.Error(fiber.StatusInternalServerError, "internal error", err.Error(), nil))
 	}
@@ -79,7 +81,8 @@ func (ctl *TaskController) UpdateTask(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(core.Error(fiber.StatusBadRequest, "bad request", err.Error(), nil))
 	}
 
-	resp, err := ctl.taskService.Update(c.Context(), c, task)
+	userID, _ := c.Locals("userID").(uuid.UUID)
+	resp, err := ctl.taskService.Update(c.Context(), userID, task)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(core.Error(fiber.StatusInternalServerError, "internal error", err.Error(), nil))
 	}
@@ -97,7 +100,9 @@ func (ctl *TaskController) DeleteTask(c *fiber.Ctx) error {
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(core.Error(fiber.StatusBadRequest, "bad request", err.Error(), nil))
 	}
-	resp, err := ctl.taskService.Delete(c.Context(), c, req.ID)
+
+	userID, _ := c.Locals("userID").(uuid.UUID)
+	resp, err := ctl.taskService.Delete(c.Context(), userID, req.ID)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(core.Error(fiber.StatusInternalServerError, "internal error", err.Error(), nil))
 	}
