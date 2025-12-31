@@ -4,13 +4,18 @@ import (
 	"context"
 	"encoding/json"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/create-go-app/fiber-go-template/app/dto"
 	models "github.com/create-go-app/fiber-go-template/app/entities"
 	"github.com/create-go-app/fiber-go-template/pkg/core"
+	"github.com/create-go-app/fiber-go-template/pkg/middleware"
+	"github.com/create-go-app/fiber-go-template/pkg/repository"
 	"github.com/gofiber/fiber/v2"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -37,28 +42,43 @@ func (m *MockTaskService) GetTask(ctx context.Context, id string) (*core.ApiResp
 	return args.Get(0).(*core.ApiResponse), args.Error(1)
 }
 
-func (m *MockTaskService) Create(ctx context.Context, c any, req *dto.CreateTaskReq) (*core.ApiResponse, error) {
-	args := m.Called(ctx, c, req)
+func (m *MockTaskService) Create(ctx context.Context, userID uuid.UUID, req *dto.CreateTaskReq) (*core.ApiResponse, error) {
+	args := m.Called(ctx, userID, req)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
 	return args.Get(0).(*core.ApiResponse), args.Error(1)
 }
 
-func (m *MockTaskService) Update(ctx context.Context, c any, task *models.Task) (*core.ApiResponse, error) {
-	args := m.Called(ctx, c, task)
+func (m *MockTaskService) Update(ctx context.Context, userID uuid.UUID, task *models.Task) (*core.ApiResponse, error) {
+	args := m.Called(ctx, userID, task)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
 	return args.Get(0).(*core.ApiResponse), args.Error(1)
 }
 
-func (m *MockTaskService) Delete(ctx context.Context, c any, id string) (*core.ApiResponse, error) {
-	args := m.Called(ctx, c, id)
+func (m *MockTaskService) Delete(ctx context.Context, userID uuid.UUID, id string) (*core.ApiResponse, error) {
+	args := m.Called(ctx, userID, id)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
 	return args.Get(0).(*core.ApiResponse), args.Error(1)
+}
+
+func makeTestToken(secret string, userID uuid.UUID, creds map[string]bool, exp int64) (string, error) {
+	claims := jwt.MapClaims{
+		"id":          userID.String(),
+		"exp":         exp,
+		"task:create": creds["task:create"],
+		"task:update": creds["task:update"],
+		"task:delete": creds["task:delete"],
+		"book:create": false,
+		"book:update": false,
+		"book:delete": false,
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString([]byte(secret))
 }
 
 func TestGetTasks(t *testing.T) {
@@ -122,7 +142,7 @@ func TestCreateTask(t *testing.T) {
 	mockService := new(MockTaskService)
 	controller := NewTaskController(mockService)
 
-	app.Post("/task", controller.CreateTask)
+	app.Post("/task", middleware.RequireCredentials(repository.TaskCreateCredential), controller.CreateTask)
 
 	createReq := &dto.CreateTaskReq{
 		Title: "New Task",
@@ -135,12 +155,21 @@ func TestCreateTask(t *testing.T) {
 		Data:    dto.TaskRes{Title: "New Task"},
 	}
 
-	// Mock expectation - Note: the second argument 'c' is the fiber context, using mock.Anything
-	mockService.On("Create", mock.Anything, mock.Anything, createReq).Return(expectedResponse, nil)
+	userID := uuid.New()
+	mockService.On("Create", mock.Anything, userID, createReq).Return(expectedResponse, nil)
+
+	secret := "test-secret"
+	_ = os.Setenv("JWT_SECRET_KEY", secret)
+	token, _ := makeTestToken(secret, userID, map[string]bool{
+		"task:create": true,
+		"task:update": true,
+		"task:delete": true,
+	}, time.Now().Add(time.Hour).Unix())
 
 	// Request
 	req := httptest.NewRequest("POST", "/task", strings.NewReader(string(body)))
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
 	resp, _ := app.Test(req)
 
 	// Assertions
@@ -154,7 +183,7 @@ func TestUpdateTask(t *testing.T) {
 	mockService := new(MockTaskService)
 	controller := NewTaskController(mockService)
 
-	app.Put("/task", controller.UpdateTask)
+	app.Put("/task", middleware.RequireCredentials(repository.TaskUpdateCredential), controller.UpdateTask)
 
 	taskID := "123e4567-e89b-12d3-a456-426614174000"
 	// Create UUID for test
@@ -174,15 +203,23 @@ func TestUpdateTask(t *testing.T) {
 	}
 
 	// Mock expectation
-	// Since controller parses body into a struct pointer, we should match loosely or use a custom matcher if needed.
-	// For simplicity, we match mock.AnythingOfType("*models.Task")
-	mockService.On("Update", mock.Anything, mock.Anything, mock.MatchedBy(func(t *models.Task) bool {
+	userID := uuid.New()
+	mockService.On("Update", mock.Anything, userID, mock.MatchedBy(func(t *models.Task) bool {
 		return t.ID.String() == taskID && t.Title == "Updated Task"
 	})).Return(expectedResponse, nil)
+
+	secret := "test-secret"
+	_ = os.Setenv("JWT_SECRET_KEY", secret)
+	token, _ := makeTestToken(secret, userID, map[string]bool{
+		"task:create": true,
+		"task:update": true,
+		"task:delete": true,
+	}, time.Now().Add(time.Hour).Unix())
 
 	// Request
 	req := httptest.NewRequest("PUT", "/task", strings.NewReader(reqBody))
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
 	resp, _ := app.Test(req)
 
 	// Assertions
@@ -196,7 +233,7 @@ func TestDeleteTask(t *testing.T) {
 	mockService := new(MockTaskService)
 	controller := NewTaskController(mockService)
 
-	app.Delete("/task", controller.DeleteTask)
+	app.Delete("/task", middleware.RequireCredentials(repository.TaskDeleteCredential), controller.DeleteTask)
 
 	taskID := "123e4567-e89b-12d3-a456-426614174000"
 	reqBody := `{"id":"` + taskID + `"}`
@@ -207,11 +244,21 @@ func TestDeleteTask(t *testing.T) {
 	}
 
 	// Mock expectation
-	mockService.On("Delete", mock.Anything, mock.Anything, taskID).Return(expectedResponse, nil)
+	userID := uuid.New()
+	mockService.On("Delete", mock.Anything, userID, taskID).Return(expectedResponse, nil)
+
+	secret := "test-secret"
+	_ = os.Setenv("JWT_SECRET_KEY", secret)
+	token, _ := makeTestToken(secret, userID, map[string]bool{
+		"task:create": true,
+		"task:update": true,
+		"task:delete": true,
+	}, time.Now().Add(time.Hour).Unix())
 
 	// Request
 	req := httptest.NewRequest("DELETE", "/task", strings.NewReader(reqBody))
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
 	resp, _ := app.Test(req)
 
 	// Assertions
