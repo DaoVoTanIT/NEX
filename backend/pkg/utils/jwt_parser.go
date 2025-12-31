@@ -35,14 +35,15 @@ func ExtractTokenMetadata(c *fiber.Ctx) (*TokenMetadata, error) {
 		// Expires time.
 		expires := int64(claims["exp"].(float64))
 
+		// User credentials.
 		credentials := map[string]bool{
-			"book:create": claims["book:create"].(bool),
-			"book:update": claims["book:update"].(bool),
-			"book:delete": claims["book:delete"].(bool),
-			"task:create": claims["task:create"].(bool),
-			"task:update": claims["task:update"].(bool),
-			"task:delete": claims["task:delete"].(bool),
-			"task:view":   claims["task:view"].(bool),
+			"book:create": getClaimBool(claims, "book:create"),
+			"book:update": getClaimBool(claims, "book:update"),
+			"book:delete": getClaimBool(claims, "book:delete"),
+			"task:create": getClaimBool(claims, "task:create"),
+			"task:update": getClaimBool(claims, "task:update"),
+			"task:delete": getClaimBool(claims, "task:delete"),
+			"task:view":   getClaimBool(claims, "task:view"),
 		}
 
 		return &TokenMetadata{
@@ -53,6 +54,15 @@ func ExtractTokenMetadata(c *fiber.Ctx) (*TokenMetadata, error) {
 	}
 
 	return nil, err
+}
+
+func getClaimBool(claims jwt.MapClaims, key string) bool {
+	val, ok := claims[key]
+	if !ok {
+		return false
+	}
+	b, ok := val.(bool)
+	return ok && b
 }
 
 func extractToken(c *fiber.Ctx) string {
