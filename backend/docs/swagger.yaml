@@ -1,5 +1,17 @@
 basePath: /api
 definitions:
+  core.ApiResponse:
+    properties:
+      code:
+        type: integer
+      data: {}
+      error: {}
+      message:
+        type: string
+      meta: {}
+      success:
+        type: boolean
+    type: object
   dto.CreateTaskReq:
     properties:
       assigned_to:
@@ -12,44 +24,28 @@ definitions:
     required:
     - title
     type: object
-  models.Book:
+  dto.TaskRes:
     properties:
-      author:
-        maxLength: 255
+      assigned_to:
         type: string
-      book_attrs:
-        $ref: '#/definitions/models.BookAttrs'
-      book_status:
-        type: integer
+      assigned_to_name:
+        type: string
+      create_by_name:
+        type: string
       created_at:
+        type: string
+      created_by:
+        type: string
+      description:
         type: string
       id:
         type: string
+      status:
+        type: string
       title:
-        maxLength: 255
         type: string
       updated_at:
         type: string
-      user_id:
-        type: string
-    required:
-    - author
-    - book_attrs
-    - book_status
-    - id
-    - title
-    - user_id
-    type: object
-  models.BookAttrs:
-    properties:
-      description:
-        type: string
-      picture:
-        type: string
-      rating:
-        maximum: 10
-        minimum: 1
-        type: integer
     type: object
   models.SignIn:
     properties:
@@ -68,6 +64,9 @@ definitions:
       email:
         maxLength: 255
         type: string
+      name:
+        maxLength: 255
+        type: string
       password:
         maxLength: 255
         type: string
@@ -76,30 +75,9 @@ definitions:
         type: string
     required:
     - email
+    - name
     - password
     - user_role
-    type: object
-  models.Task:
-    properties:
-      assigned_to:
-        type: string
-      created_at:
-        type: string
-      created_by:
-        type: string
-      description:
-        type: string
-      id:
-        type: string
-      meta:
-        additionalProperties: true
-        type: object
-      status:
-        type: string
-      title:
-        type: string
-      updated_at:
-        type: string
     type: object
   models.User:
     properties:
@@ -109,6 +87,8 @@ definitions:
         maxLength: 255
         type: string
       id:
+        type: string
+      name:
         type: string
       password_hash:
         maxLength: 255
@@ -139,162 +119,6 @@ info:
   title: API
   version: "1.0"
 paths:
-  /v1/book:
-    delete:
-      consumes:
-      - application/json
-      description: Delete book by given ID.
-      parameters:
-      - description: Book ID
-        in: body
-        name: id
-        required: true
-        schema:
-          type: string
-      produces:
-      - application/json
-      responses:
-        "204":
-          description: ok
-          schema:
-            type: string
-      security:
-      - ApiKeyAuth: []
-      summary: delete book by given ID
-      tags:
-      - Book
-    post:
-      consumes:
-      - application/json
-      description: Create a new book.
-      parameters:
-      - description: Title
-        in: body
-        name: title
-        required: true
-        schema:
-          type: string
-      - description: Author
-        in: body
-        name: author
-        required: true
-        schema:
-          type: string
-      - description: User ID
-        in: body
-        name: user_id
-        required: true
-        schema:
-          type: string
-      - description: Book attributes
-        in: body
-        name: book_attrs
-        required: true
-        schema:
-          $ref: '#/definitions/models.BookAttrs'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/models.Book'
-      security:
-      - ApiKeyAuth: []
-      summary: create a new book
-      tags:
-      - Book
-    put:
-      consumes:
-      - application/json
-      description: Update book.
-      parameters:
-      - description: Book ID
-        in: body
-        name: id
-        required: true
-        schema:
-          type: string
-      - description: Title
-        in: body
-        name: title
-        required: true
-        schema:
-          type: string
-      - description: Author
-        in: body
-        name: author
-        required: true
-        schema:
-          type: string
-      - description: User ID
-        in: body
-        name: user_id
-        required: true
-        schema:
-          type: string
-      - description: Book status
-        in: body
-        name: book_status
-        required: true
-        schema:
-          type: integer
-      - description: Book attributes
-        in: body
-        name: book_attrs
-        required: true
-        schema:
-          $ref: '#/definitions/models.BookAttrs'
-      produces:
-      - application/json
-      responses:
-        "202":
-          description: ok
-          schema:
-            type: string
-      security:
-      - ApiKeyAuth: []
-      summary: update book
-      tags:
-      - Book
-  /v1/book/{id}:
-    get:
-      consumes:
-      - application/json
-      description: Get book by given ID.
-      parameters:
-      - description: Book ID
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/models.Book'
-      summary: get book by given ID
-      tags:
-      - Book
-  /v1/books:
-    get:
-      consumes:
-      - application/json
-      description: Get all exists books.
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            items:
-              $ref: '#/definitions/models.Book'
-            type: array
-      summary: get all exists books
-      tags:
-      - Books
   /v1/task:
     delete:
       responses: {}
@@ -328,7 +152,21 @@ paths:
       - Task
   /v1/task/{id}:
     get:
-      responses: {}
+      consumes:
+      - application/json
+      parameters:
+      - description: Task ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.TaskRes'
       security:
       - ApiKeyAuth: []
       tags:
@@ -343,9 +181,14 @@ paths:
         "200":
           description: OK
           schema:
-            items:
-              $ref: '#/definitions/models.Task'
-            type: array
+            allOf:
+            - $ref: '#/definitions/core.ApiResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/dto.TaskRes'
+                  type: array
+              type: object
       security:
       - ApiKeyAuth: []
       summary: get all exists tasks

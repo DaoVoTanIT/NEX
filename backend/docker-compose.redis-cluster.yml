@@ -1,0 +1,98 @@
+version: '3.8'
+
+services:
+  redis-node-1:
+    image: redis:7-alpine
+    container_name: redis-node-1
+    command: redis-server --port 6379 --cluster-enabled yes --cluster-config-file nodes.conf --cluster-node-timeout 5000 --appendonly yes --protected-mode no
+    ports: ["7001:6379"]
+    volumes:
+      - redis1_data:/data
+    networks:
+      - redis-cluster
+
+  redis-node-2:
+    image: redis:7-alpine
+    container_name: redis-node-2
+    command: redis-server --port 6379 --cluster-enabled yes --cluster-config-file nodes.conf --cluster-node-timeout 5000 --appendonly yes --protected-mode no
+    ports: ["7002:6379"]
+    volumes:
+      - redis2_data:/data
+    networks:
+      - redis-cluster
+
+  redis-node-3:
+    image: redis:7-alpine
+    container_name: redis-node-3
+    command: redis-server --port 6379 --cluster-enabled yes --cluster-config-file nodes.conf --cluster-node-timeout 5000 --appendonly yes --protected-mode no
+    ports: ["7003:6379"]
+    volumes:
+      - redis3_data:/data
+    networks:
+      - redis-cluster
+
+  redis-node-4:
+    image: redis:7-alpine
+    container_name: redis-node-4
+    command: redis-server --port 6379 --cluster-enabled yes --cluster-config-file nodes.conf --cluster-node-timeout 5000 --appendonly yes --protected-mode no
+    ports: ["7004:6379"]
+    volumes:
+      - redis4_data:/data
+    networks:
+      - redis-cluster
+
+  redis-node-5:
+    image: redis:7-alpine
+    container_name: redis-node-5
+    command: redis-server --port 6379 --cluster-enabled yes --cluster-config-file nodes.conf --cluster-node-timeout 5000 --appendonly yes --protected-mode no
+    ports: ["7005:6379"]
+    volumes:
+      - redis5_data:/data
+    networks:
+      - redis-cluster
+
+  redis-node-6:
+    image: redis:7-alpine
+    container_name: redis-node-6
+    command: redis-server --port 6379 --cluster-enabled yes --cluster-config-file nodes.conf --cluster-node-timeout 5000 --appendonly yes --protected-mode no
+    ports: ["7006:6379"]
+    volumes:
+      - redis6_data:/data
+    networks:
+      - redis-cluster
+
+  # Helper container to create the cluster
+  redis-cluster-init:
+    image: redis:7-alpine
+    depends_on:
+      - redis-node-1
+      - redis-node-2
+      - redis-node-3
+      - redis-node-4
+      - redis-node-5
+      - redis-node-6
+    command: >
+      sh -c "sleep 10 && 
+             redis-cli --cluster create 
+             redis-node-1:6379 
+             redis-node-2:6379 
+             redis-node-3:6379 
+             redis-node-4:6379 
+             redis-node-5:6379 
+             redis-node-6:6379 
+             --cluster-replicas 1 
+             --cluster-yes"
+    networks:
+      - redis-cluster
+
+volumes:
+  redis1_data:
+  redis2_data:
+  redis3_data:
+  redis4_data:
+  redis5_data:
+  redis6_data:
+
+networks:
+  redis-cluster:
+    driver: bridge

@@ -4,15 +4,14 @@ import (
 	"os"
 
 	"github.com/create-go-app/fiber-go-template/pkg/configs"
+	"github.com/create-go-app/fiber-go-template/pkg/di"
 	"github.com/create-go-app/fiber-go-template/pkg/middleware"
 	"github.com/create-go-app/fiber-go-template/pkg/routes"
 	"github.com/create-go-app/fiber-go-template/pkg/utils"
-
 	"github.com/gofiber/fiber/v2"
 
-	_ "github.com/create-go-app/fiber-go-template/docs" // load API Docs files (Swagger)
-
-	_ "github.com/joho/godotenv/autoload" // load .env file automatically
+	_ "github.com/create-go-app/fiber-go-template/docs"
+	_ "github.com/joho/godotenv/autoload"
 )
 
 // @title API
@@ -34,13 +33,18 @@ func main() {
 	// Define a new Fiber app with config.
 	app := fiber.New(config)
 
+	container, err := di.NewContainer()
+	if err != nil {
+		panic(err)
+	}
+
 	// Middlewares.
 	middleware.FiberMiddleware(app) // Register Fiber's middleware for app.
 
 	// Routes.
-	routes.SwaggerRoute(app)  // Register a route for API Docs (Swagger).
-	routes.PublicRoutes(app)  // Register a public routes for app.
-	routes.PrivateRoutes(app) // Register a private routes for app.
+	routes.SwaggerRoute(app) // Register a route for API Docs (Swagger).
+	routes.PublicRoutes(app, container.AuthController)
+	routes.PrivateRoutes(app, container.JWTMiddleware, container.AuthController, container.TokenController, container.TaskController)
 	routes.NotFoundRoute(app) // Register route for 404 Error.
 
 	// Start server (with or without graceful shutdown).

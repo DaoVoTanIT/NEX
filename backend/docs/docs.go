@@ -23,249 +23,6 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
-        "/v1/book": {
-            "put": {
-                "security": [
-                    {
-                        "ApiKeyAuth": []
-                    }
-                ],
-                "description": "Update book.",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Book"
-                ],
-                "summary": "update book",
-                "parameters": [
-                    {
-                        "description": "Book ID",
-                        "name": "id",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    {
-                        "description": "Title",
-                        "name": "title",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    {
-                        "description": "Author",
-                        "name": "author",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    {
-                        "description": "User ID",
-                        "name": "user_id",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    {
-                        "description": "Book status",
-                        "name": "book_status",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "type": "integer"
-                        }
-                    },
-                    {
-                        "description": "Book attributes",
-                        "name": "book_attrs",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/models.BookAttrs"
-                        }
-                    }
-                ],
-                "responses": {
-                    "202": {
-                        "description": "ok",
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                }
-            },
-            "post": {
-                "security": [
-                    {
-                        "ApiKeyAuth": []
-                    }
-                ],
-                "description": "Create a new book.",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Book"
-                ],
-                "summary": "create a new book",
-                "parameters": [
-                    {
-                        "description": "Title",
-                        "name": "title",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    {
-                        "description": "Author",
-                        "name": "author",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    {
-                        "description": "User ID",
-                        "name": "user_id",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    {
-                        "description": "Book attributes",
-                        "name": "book_attrs",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/models.BookAttrs"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/models.Book"
-                        }
-                    }
-                }
-            },
-            "delete": {
-                "security": [
-                    {
-                        "ApiKeyAuth": []
-                    }
-                ],
-                "description": "Delete book by given ID.",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Book"
-                ],
-                "summary": "delete book by given ID",
-                "parameters": [
-                    {
-                        "description": "Book ID",
-                        "name": "id",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "responses": {
-                    "204": {
-                        "description": "ok",
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                }
-            }
-        },
-        "/v1/book/{id}": {
-            "get": {
-                "description": "Get book by given ID.",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Book"
-                ],
-                "summary": "get book by given ID",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Book ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/models.Book"
-                        }
-                    }
-                }
-            }
-        },
-        "/v1/books": {
-            "get": {
-                "description": "Get all exists books.",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Books"
-                ],
-                "summary": "get all exists books",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/models.Book"
-                            }
-                        }
-                    }
-                }
-            }
-        },
         "/v1/task": {
             "put": {
                 "security": [
@@ -328,10 +85,32 @@ const docTemplate = `{
                         "ApiKeyAuth": []
                     }
                 ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
                 "tags": [
                     "Task"
                 ],
-                "responses": {}
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Task ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.TaskRes"
+                        }
+                    }
+                }
             }
         },
         "/v1/tasks": {
@@ -355,10 +134,22 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/models.Task"
-                            }
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.ApiResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/dto.TaskRes"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     }
                 }
@@ -502,6 +293,23 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "core.ApiResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {},
+                "error": {},
+                "message": {
+                    "type": "string"
+                },
+                "meta": {},
+                "success": {
+                    "type": "boolean"
+                }
+            }
+        },
         "dto.CreateTaskReq": {
             "type": "object",
             "required": [
@@ -520,58 +328,38 @@ const docTemplate = `{
                 }
             }
         },
-        "models.Book": {
+        "dto.TaskRes": {
             "type": "object",
-            "required": [
-                "author",
-                "book_attrs",
-                "book_status",
-                "id",
-                "title",
-                "user_id"
-            ],
             "properties": {
-                "author": {
-                    "type": "string",
-                    "maxLength": 255
+                "assigned_to": {
+                    "type": "string"
                 },
-                "book_attrs": {
-                    "$ref": "#/definitions/models.BookAttrs"
+                "assigned_to_name": {
+                    "type": "string"
                 },
-                "book_status": {
-                    "type": "integer"
+                "create_by_name": {
+                    "type": "string"
                 },
                 "created_at": {
+                    "type": "string"
+                },
+                "created_by": {
+                    "type": "string"
+                },
+                "description": {
                     "type": "string"
                 },
                 "id": {
                     "type": "string"
                 },
+                "status": {
+                    "type": "string"
+                },
                 "title": {
-                    "type": "string",
-                    "maxLength": 255
+                    "type": "string"
                 },
                 "updated_at": {
                     "type": "string"
-                },
-                "user_id": {
-                    "type": "string"
-                }
-            }
-        },
-        "models.BookAttrs": {
-            "type": "object",
-            "properties": {
-                "description": {
-                    "type": "string"
-                },
-                "picture": {
-                    "type": "string"
-                },
-                "rating": {
-                    "type": "integer",
-                    "maximum": 10,
-                    "minimum": 1
                 }
             }
         },
@@ -596,11 +384,16 @@ const docTemplate = `{
             "type": "object",
             "required": [
                 "email",
+                "name",
                 "password",
                 "user_role"
             ],
             "properties": {
                 "email": {
+                    "type": "string",
+                    "maxLength": 255
+                },
+                "name": {
                     "type": "string",
                     "maxLength": 255
                 },
@@ -611,39 +404,6 @@ const docTemplate = `{
                 "user_role": {
                     "type": "string",
                     "maxLength": 25
-                }
-            }
-        },
-        "models.Task": {
-            "type": "object",
-            "properties": {
-                "assigned_to": {
-                    "type": "string"
-                },
-                "created_at": {
-                    "type": "string"
-                },
-                "created_by": {
-                    "type": "string"
-                },
-                "description": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "meta": {
-                    "type": "object",
-                    "additionalProperties": true
-                },
-                "status": {
-                    "type": "string"
-                },
-                "title": {
-                    "type": "string"
-                },
-                "updated_at": {
-                    "type": "string"
                 }
             }
         },
@@ -665,6 +425,9 @@ const docTemplate = `{
                     "maxLength": 255
                 },
                 "id": {
+                    "type": "string"
+                },
+                "name": {
                     "type": "string"
                 },
                 "password_hash": {

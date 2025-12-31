@@ -16,9 +16,6 @@ func GetCredentialsByRole(role string) ([]string, error) {
 	case repository.AdminRoleName:
 		// Admin credentials (all access).
 		credentials = []string{
-			repository.BookCreateCredential,
-			repository.BookUpdateCredential,
-			repository.BookDeleteCredential,
 			repository.TaskCreateCredential,
 			repository.TaskUpdateCredential,
 			repository.TaskDeleteCredential,
@@ -27,15 +24,14 @@ func GetCredentialsByRole(role string) ([]string, error) {
 			repository.HistoryViewCredential,
 		}
 	case repository.ModeratorRoleName:
-		// Moderator credentials (only book creation and update).
 		credentials = []string{
-			repository.BookCreateCredential,
-			repository.BookUpdateCredential,
+			repository.TaskCreateCredential,
+			repository.TaskUpdateCredential,
+			repository.TaskViewCredential,
 		}
 	case repository.UserRoleName:
-		// Simple user credentials (only book creation).
 		credentials = []string{
-			repository.BookCreateCredential,
+			repository.TaskCreateCredential,
 		}
 	default:
 		// Return error message.
