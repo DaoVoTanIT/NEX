@@ -1,4 +1,4 @@
-# 🚀 Hướng Dẫn Nhanh - Go Fiber Backend với Clean Architecture
+# 🚀 Hướng Dẫn Nhanh
 
 ## 📖 Tổng quan dự án
 
