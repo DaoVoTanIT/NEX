@@ -8,6 +8,7 @@ import (
 	"github.com/create-go-app/fiber-go-template/app/interfaces/services"
 	"github.com/create-go-app/fiber-go-template/app/repository"
 	serviceimpl "github.com/create-go-app/fiber-go-template/app/services"
+	"github.com/create-go-app/fiber-go-template/pkg/crypto"
 	"github.com/create-go-app/fiber-go-template/pkg/middleware"
 	"github.com/create-go-app/fiber-go-template/platform/cache"
 	"github.com/create-go-app/fiber-go-template/platform/database"
@@ -16,18 +17,16 @@ import (
 )
 
 type Container struct {
-	DB              *gorm.DB
-	Cache           *cache.CacheService
-	UserRepo        apprepos.UserRepository
-	TaskRepo        apprepos.TaskRepository
-	TaskHistoryRepo apprepos.TaskHistoryRepository
-	AuthService     services.AuthService
-	TokenService    services.TokenService
-	TaskService     services.TaskService
-	AuthController  *controllers.AuthController
-	TokenController *controllers.TokenController
-	TaskController  *controllers.TaskController
-	JWTMiddleware   func(*fiber.Ctx) error
+	DB               *gorm.DB
+	Cache            *cache.CacheService
+	UserRepo         apprepos.UserRepository
+	AuthService      services.AuthService
+	TokenService     services.TokenService
+	AuthController   *controllers.AuthController
+	TokenController  *controllers.TokenController
+	WalletService    services.WalletService
+	WalletController *controllers.WalletController
+	JWTMiddleware    func(*fiber.Ctx) error
 }
 
 func NewContainer() (*Container, error) {
@@ -40,37 +39,43 @@ func NewContainer() (*Container, error) {
 	if err != nil {
 		return nil, err
 	}
+	var txManager apprepos.TransactionManager = database.NewGormTransactionManager(gormDB)
 
 	var userRepo apprepos.UserRepository = repository.NewUserRepository(gormDB)
-	var taskRepo apprepos.TaskRepository = repository.NewTaskRepository(gormDB)
-	var taskHistoryRepo apprepos.TaskHistoryRepository = repository.NewTaskHistoryRepository(gormDB)
-	var txManager apprepos.TransactionManager = database.NewGormTransactionManager(gormDB)
 
 	authService := serviceimpl.NewAuthService(userRepo, cacheService)
 	tokenService := serviceimpl.NewTokenService(userRepo, cacheService)
-	taskService := serviceimpl.NewTaskService(taskRepo, taskHistoryRepo, txManager)
 
 	authCtrl := controllers.NewAuthController(authService)
 	tokenCtrl := controllers.NewTokenController(tokenService)
-	taskCtrl := controllers.NewTaskController(taskService)
 
 	jwtConfig := middleware.JWTConfig{
 		SecretKey: os.Getenv("JWT_SECRET_KEY"),
 	}
 	jwtMiddleware := middleware.NewJWTProtected(jwtConfig)
+	// Wallet
+	cryptoService := crypto.NewCryptoService()
+	walletRepo := repository.NewWalletRepository(gormDB)
+	addressRepo := repository.NewBlockchainAddressRepository(gormDB)
 
+	walletService := serviceimpl.NewWalletService(
+		walletRepo,
+		addressRepo,
+		cryptoService,
+		txManager,
+	)
+
+	walletController := controllers.NewWalletController(walletService)
 	return &Container{
-		DB:              gormDB,
-		Cache:           cacheService,
-		UserRepo:        userRepo,
-		TaskRepo:        taskRepo,
-		TaskHistoryRepo: taskHistoryRepo,
-		AuthService:     authService,
-		TokenService:    tokenService,
-		TaskService:     taskService,
-		AuthController:  authCtrl,
-		TokenController: tokenCtrl,
-		TaskController:  taskCtrl,
-		JWTMiddleware:   jwtMiddleware,
+		DB:               gormDB,
+		Cache:            cacheService,
+		UserRepo:         userRepo,
+		AuthService:      authService,
+		TokenService:     tokenService,
+		AuthController:   authCtrl,
+		TokenController:  tokenCtrl,
+		JWTMiddleware:    jwtMiddleware,
+		WalletService:    walletService,
+		WalletController: walletController,
 	}, nil
 }

@@ -23,138 +23,6 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
-        "/v1/task": {
-            "put": {
-                "security": [
-                    {
-                        "ApiKeyAuth": []
-                    }
-                ],
-                "tags": [
-                    "Task"
-                ],
-                "responses": {}
-            },
-            "post": {
-                "security": [
-                    {
-                        "ApiKeyAuth": []
-                    },
-                    {
-                        "ApiKeyAuth": []
-                    }
-                ],
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Task"
-                ],
-                "parameters": [
-                    {
-                        "description": "Create task request",
-                        "name": "task",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/dto.CreateTaskReq"
-                        }
-                    }
-                ],
-                "responses": {}
-            },
-            "delete": {
-                "security": [
-                    {
-                        "ApiKeyAuth": []
-                    }
-                ],
-                "tags": [
-                    "Task"
-                ],
-                "responses": {}
-            }
-        },
-        "/v1/task/{id}": {
-            "get": {
-                "security": [
-                    {
-                        "ApiKeyAuth": []
-                    }
-                ],
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Task"
-                ],
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Task ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/dto.TaskRes"
-                        }
-                    }
-                }
-            }
-        },
-        "/v1/tasks": {
-            "get": {
-                "security": [
-                    {
-                        "ApiKeyAuth": []
-                    }
-                ],
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Tasks"
-                ],
-                "summary": "get all exists tasks",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/core.ApiResponse"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "$ref": "#/definitions/dto.TaskRes"
-                                            }
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        },
         "/v1/token/renew": {
             "post": {
                 "security": [
@@ -285,7 +153,121 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/models.User"
+                            "$ref": "#/definitions/models.Users"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/wallet": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Create a new crypto wallet with generated mnemonic and first blockchain address",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Wallet"
+                ],
+                "summary": "Create a new wallet",
+                "parameters": [
+                    {
+                        "description": "Create wallet payload",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.CreateWalletReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/dto.CreateWalletRes"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ApiResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/core.ApiResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/wallet/restore": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Restore access to an existing wallet using secret phrase and optional passphrase.\nIf the wallet was protected with a passphrase, the correct passphrase must be provided.\nOn success, returns wallet identifier and associated blockchain addresses.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Wallet"
+                ],
+                "summary": "Restore / Access existing wallet",
+                "parameters": [
+                    {
+                        "description": "Restore wallet payload (secret phrase and optional passphrase)",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.RestoreWalletReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Wallet restored successfully",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.ApiResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dto.RestoreWalletRes"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid secret phrase or passphrase",
+                        "schema": {
+                            "$ref": "#/definitions/core.ApiResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/core.ApiResponse"
                         }
                     }
                 }
@@ -310,55 +292,83 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.CreateTaskReq": {
+        "dto.CreateWalletReq": {
             "type": "object",
             "required": [
-                "title"
+                "wallet_name"
             ],
             "properties": {
-                "assigned_to": {
+                "passphrase": {
                     "type": "string"
                 },
-                "description": {
-                    "type": "string"
-                },
-                "title": {
+                "wallet_name": {
                     "type": "string",
-                    "maxLength": 255
+                    "maxLength": 50,
+                    "minLength": 3
                 }
             }
         },
-        "dto.TaskRes": {
+        "dto.CreateWalletRes": {
             "type": "object",
             "properties": {
-                "assigned_to": {
+                "address": {
                     "type": "string"
                 },
-                "assigned_to_name": {
+                "secretPhrase": {
                     "type": "string"
                 },
-                "create_by_name": {
+                "wallet_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.RestoreWalletReq": {
+            "type": "object",
+            "required": [
+                "secret_phrase"
+            ],
+            "properties": {
+                "passphrase": {
                     "type": "string"
                 },
-                "created_at": {
+                "secret_phrase": {
                     "type": "string"
                 },
-                "created_by": {
+                "wallet_name": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.RestoreWalletRes": {
+            "type": "object",
+            "properties": {
+                "addresses": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "wallet_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.BlockchainAddress": {
+            "type": "object",
+            "properties": {
+                "address": {
                     "type": "string"
                 },
-                "description": {
+                "addressId": {
                     "type": "string"
                 },
-                "id": {
+                "createDate": {
                     "type": "string"
                 },
-                "status": {
+                "updateDate": {
                     "type": "string"
                 },
-                "title": {
-                    "type": "string"
-                },
-                "updated_at": {
+                "walletId": {
                     "type": "string"
                 }
             }
@@ -407,42 +417,114 @@ const docTemplate = `{
                 }
             }
         },
-        "models.User": {
+        "models.Transaction": {
             "type": "object",
-            "required": [
-                "email",
-                "id",
-                "password_hash",
-                "user_role",
-                "user_status"
-            ],
             "properties": {
-                "created_at": {
+                "amount": {
+                    "type": "number"
+                },
+                "fromAddress": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "toAddress": {
+                    "type": "string"
+                },
+                "transactionDate": {
+                    "type": "string"
+                },
+                "transactionId": {
+                    "type": "string"
+                },
+                "wallet": {
+                    "description": "🔗 Relation",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/models.Wallet"
+                        }
+                    ]
+                },
+                "walletId": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.Users": {
+            "type": "object",
+            "properties": {
+                "createDate": {
+                    "type": "string"
+                },
+                "createdUserId": {
                     "type": "string"
                 },
                 "email": {
-                    "type": "string",
-                    "maxLength": 255
-                },
-                "id": {
                     "type": "string"
                 },
                 "name": {
                     "type": "string"
                 },
-                "password_hash": {
-                    "type": "string",
-                    "maxLength": 255
-                },
-                "updated_at": {
+                "passwordHash": {
                     "type": "string"
                 },
-                "user_role": {
-                    "type": "string",
-                    "maxLength": 25
+                "updateDate": {
+                    "type": "string"
                 },
-                "user_status": {
+                "updatedUserId": {
+                    "type": "string"
+                },
+                "userId": {
+                    "type": "string"
+                },
+                "userRole": {
+                    "type": "string"
+                },
+                "userStatus": {
                     "type": "integer"
+                },
+                "wallets": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.Wallet"
+                    }
+                }
+            }
+        },
+        "models.Wallet": {
+            "type": "object",
+            "properties": {
+                "blockchainAddresses": {
+                    "description": "🔗 Relations",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.BlockchainAddress"
+                    }
+                },
+                "createDate": {
+                    "type": "string"
+                },
+                "passphraseHash": {
+                    "type": "string"
+                },
+                "secretPhraseHash": {
+                    "type": "string"
+                },
+                "transactions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.Transaction"
+                    }
+                },
+                "updateDate": {
+                    "type": "string"
+                },
+                "walletId": {
+                    "type": "string"
+                },
+                "walletName": {
+                    "type": "string"
                 }
             }
         }

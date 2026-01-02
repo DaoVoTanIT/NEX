@@ -44,7 +44,7 @@ func (s *TokenServiceImpl) Renew(ctx context.Context, c any, refreshToken string
 
 	userID := claims.UserID
 
-	user, err := s.userRepo.GetUserByID(ctx, userID)
+	user, err := s.userRepo.GetUserByID(ctx, userID.String())
 	if err != nil {
 		return core.Error(404, "user not found", err.Error(), nil), nil
 	}

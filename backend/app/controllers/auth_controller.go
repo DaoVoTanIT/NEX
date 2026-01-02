@@ -25,7 +25,7 @@ func NewAuthController(authService services.AuthService) *AuthController {
 // @Accept json
 // @Produce json
 // @Param data body models.SignUp true "Sign up payload"
-// @Success 200 {object} models.User
+// @Success 200 {object} models.Users
 // @Router /v1/user/sign/up [post]
 func (ctl *AuthController) UserSignUp(c *fiber.Ctx) error {
 	signUp := &models.SignUp{}

@@ -12,39 +12,57 @@ definitions:
       success:
         type: boolean
     type: object
-  dto.CreateTaskReq:
+  dto.CreateWalletReq:
     properties:
-      assigned_to:
+      passphrase:
         type: string
-      description:
-        type: string
-      title:
-        maxLength: 255
+      wallet_name:
+        maxLength: 50
+        minLength: 3
         type: string
     required:
-    - title
+    - wallet_name
     type: object
-  dto.TaskRes:
+  dto.CreateWalletRes:
     properties:
-      assigned_to:
+      address:
         type: string
-      assigned_to_name:
+      secretPhrase:
         type: string
-      create_by_name:
+      wallet_id:
         type: string
-      created_at:
+    type: object
+  dto.RestoreWalletReq:
+    properties:
+      passphrase:
         type: string
-      created_by:
+      secret_phrase:
         type: string
-      description:
+      wallet_name:
         type: string
-      id:
+    required:
+    - secret_phrase
+    type: object
+  dto.RestoreWalletRes:
+    properties:
+      addresses:
+        items:
+          type: string
+        type: array
+      wallet_id:
         type: string
-      status:
+    type: object
+  models.BlockchainAddress:
+    properties:
+      address:
         type: string
-      title:
+      addressId:
         type: string
-      updated_at:
+      createDate:
+        type: string
+      updateDate:
+        type: string
+      walletId:
         type: string
     type: object
   models.SignIn:
@@ -79,33 +97,77 @@ definitions:
     - password
     - user_role
     type: object
-  models.User:
+  models.Transaction:
     properties:
-      created_at:
+      amount:
+        type: number
+      fromAddress:
+        type: string
+      status:
+        type: string
+      toAddress:
+        type: string
+      transactionDate:
+        type: string
+      transactionId:
+        type: string
+      wallet:
+        allOf:
+        - $ref: '#/definitions/models.Wallet'
+        description: "\U0001F517 Relation"
+      walletId:
+        type: string
+    type: object
+  models.Users:
+    properties:
+      createDate:
+        type: string
+      createdUserId:
         type: string
       email:
-        maxLength: 255
-        type: string
-      id:
         type: string
       name:
         type: string
-      password_hash:
-        maxLength: 255
+      passwordHash:
         type: string
-      updated_at:
+      updateDate:
         type: string
-      user_role:
-        maxLength: 25
+      updatedUserId:
         type: string
-      user_status:
+      userId:
+        type: string
+      userRole:
+        type: string
+      userStatus:
         type: integer
-    required:
-    - email
-    - id
-    - password_hash
-    - user_role
-    - user_status
+      wallets:
+        items:
+          $ref: '#/definitions/models.Wallet'
+        type: array
+    type: object
+  models.Wallet:
+    properties:
+      blockchainAddresses:
+        description: "\U0001F517 Relations"
+        items:
+          $ref: '#/definitions/models.BlockchainAddress'
+        type: array
+      createDate:
+        type: string
+      passphraseHash:
+        type: string
+      secretPhraseHash:
+        type: string
+      transactions:
+        items:
+          $ref: '#/definitions/models.Transaction'
+        type: array
+      updateDate:
+        type: string
+      walletId:
+        type: string
+      walletName:
+        type: string
     type: object
 info:
   contact:
@@ -119,81 +181,6 @@ info:
   title: API
   version: "1.0"
 paths:
-  /v1/task:
-    delete:
-      responses: {}
-      security:
-      - ApiKeyAuth: []
-      tags:
-      - Task
-    post:
-      consumes:
-      - application/json
-      parameters:
-      - description: Create task request
-        in: body
-        name: task
-        required: true
-        schema:
-          $ref: '#/definitions/dto.CreateTaskReq'
-      produces:
-      - application/json
-      responses: {}
-      security:
-      - ApiKeyAuth: []
-      - ApiKeyAuth: []
-      tags:
-      - Task
-    put:
-      responses: {}
-      security:
-      - ApiKeyAuth: []
-      tags:
-      - Task
-  /v1/task/{id}:
-    get:
-      consumes:
-      - application/json
-      parameters:
-      - description: Task ID
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/dto.TaskRes'
-      security:
-      - ApiKeyAuth: []
-      tags:
-      - Task
-  /v1/tasks:
-    get:
-      consumes:
-      - application/json
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/core.ApiResponse'
-            - properties:
-                data:
-                  items:
-                    $ref: '#/definitions/dto.TaskRes'
-                  type: array
-              type: object
-      security:
-      - ApiKeyAuth: []
-      summary: get all exists tasks
-      tags:
-      - Tasks
   /v1/token/renew:
     post:
       consumes:
@@ -276,10 +263,83 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/models.User'
+            $ref: '#/definitions/models.Users'
       summary: create a new user
       tags:
       - User
+  /v1/wallet:
+    post:
+      consumes:
+      - application/json
+      description: Create a new crypto wallet with generated mnemonic and first blockchain
+        address
+      parameters:
+      - description: Create wallet payload
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateWalletReq'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.CreateWalletRes'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/core.ApiResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/core.ApiResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Create a new wallet
+      tags:
+      - Wallet
+  /v1/wallet/restore:
+    post:
+      consumes:
+      - application/json
+      description: |-
+        Restore access to an existing wallet using secret phrase and optional passphrase.
+        If the wallet was protected with a passphrase, the correct passphrase must be provided.
+        On success, returns wallet identifier and associated blockchain addresses.
+      parameters:
+      - description: Restore wallet payload (secret phrase and optional passphrase)
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/dto.RestoreWalletReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Wallet restored successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.ApiResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.RestoreWalletRes'
+              type: object
+        "400":
+          description: Invalid secret phrase or passphrase
+          schema:
+            $ref: '#/definitions/core.ApiResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/core.ApiResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Restore / Access existing wallet
+      tags:
+      - Wallet
 securityDefinitions:
   ApiKeyAuth:
     in: header

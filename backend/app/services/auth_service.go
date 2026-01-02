@@ -38,9 +38,9 @@ func (s *AuthServiceImpl) SignUp(ctx context.Context, input *models.SignUp) (*co
 		return core.Error(400, "invalid role", err.Error(), nil), nil
 	}
 
-	user := &models.User{
-		ID:           uuid.New(),
-		CreatedAt:    time.Now(),
+	user := &models.Users{
+		UserId:       uuid.New().String(),
+		CreateDate:   time.Now(),
 		Email:        input.Email,
 		PasswordHash: utils.GeneratePassword(input.Password),
 		UserStatus:   1,
@@ -80,12 +80,12 @@ func (s *AuthServiceImpl) SignIn(ctx context.Context, input *models.SignIn) (*co
 		return core.Error(400, "credentials error", err.Error(), nil), nil
 	}
 
-	tokens, err := utils.GenerateNewTokens(user.ID.String(), creds)
+	tokens, err := utils.GenerateNewTokens(user.UserId, creds)
 	if err != nil {
 		return core.Error(500, "token generation error", err.Error(), nil), nil
 	}
 
-	if err := s.cacheService.Set(user.ID.String(), tokens.Refresh, 0); err != nil {
+	if err := s.cacheService.Set(user.UserId, tokens.Refresh, 0); err != nil {
 		return core.Error(500, "cache token failed", err.Error(), nil), nil
 	}
 

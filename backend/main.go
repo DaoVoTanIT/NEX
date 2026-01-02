@@ -43,8 +43,8 @@ func main() {
 
 	// Routes.
 	routes.SwaggerRoute(app) // Register a route for API Docs (Swagger).
-	routes.PublicRoutes(app, container.AuthController)
-	routes.PrivateRoutes(app, container.JWTMiddleware, container.AuthController, container.TokenController, container.TaskController)
+	routes.PublicRoutes(app, container.AuthController, container.WalletController)
+	routes.PrivateRoutes(app, container.JWTMiddleware, container.AuthController, container.TokenController, container.WalletController)
 	routes.NotFoundRoute(app) // Register route for 404 Error.
 
 	// Start server (with or without graceful shutdown).

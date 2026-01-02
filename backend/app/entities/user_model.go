@@ -1,19 +1,23 @@
 package models
 
-import (
-	"time"
+import "time"
 
-	"github.com/google/uuid"
-)
+// Users đại diện bảng "Users"
+type Users struct {
+	UserId        string    `gorm:"column:UserId;primaryKey;type:varchar(128);not null"`
+	Name          string    `gorm:"column:Name;type:varchar(128);not null"`
+	Email         string    `gorm:"column:Email;type:varchar(128);not null"`
+	PasswordHash  string    `gorm:"column:PasswordHash;type:text"`
+	CreateDate    time.Time `gorm:"column:CreateDate;type:timestamptz"`
+	UpdateDate    time.Time `gorm:"column:UpdateDate;type:timestamptz"`
+	CreatedUserId string    `gorm:"column:CreatedUserId;type:varchar(128)"`
+	UpdatedUserId string    `gorm:"column:UpdatedUserId;type:varchar(128)"`
+	UserStatus    int       `gorm:"column:UserStatus;type:int"`
+	UserRole      string    `gorm:"column:UserRole;type:varchar(128);not null"`
 
-// User struct to describe User object.
-type User struct {
-	ID           uuid.UUID `db:"id" json:"id" validate:"required,uuid"`
-	Name         string    `gorm:"type:varchar(50);not null" json:"name"`
-	CreatedAt    time.Time `db:"created_at" json:"created_at"`
-	UpdatedAt    time.Time `db:"updated_at" json:"updated_at"`
-	Email        string    `db:"email" json:"email" validate:"required,email,lte=255"`
-	PasswordHash string    `db:"password_hash" json:"password_hash,omitempty" validate:"required,lte=255"`
-	UserStatus   int       `db:"user_status" json:"user_status" validate:"required,len=1"`
-	UserRole     string    `db:"user_role" json:"user_role" validate:"required,lte=25"`
+	Wallets []Wallet `gorm:"foreignKey:UserId;references:UserId;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
+}
+
+func (Users) TableName() string {
+	return "Users"
 }
