@@ -1,0 +1,213 @@
+version: "3.8"
+
+services:
+  # =========================
+  # Postgres
+  # =========================
+  postgres-container:
+    image: postgres:15-alpine
+    container_name: postgres-container
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=123456
+      - POSTGRES_DB=nexpay
+    ports:
+      - "5432:5432"
+    networks:
+      - redis-ha
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d nexpay"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # =========================
+  # Redis Master
+  # =========================
+  redis-master:
+    image: redis:7-alpine
+    container_name: redis-master
+    command: >
+      redis-server
+      --port 6379
+      --appendonly yes
+      --bind 0.0.0.0
+      --protected-mode yes
+      --requirepass ${REDIS_PASSWORD}
+    networks:
+      - redis-ha
+    volumes:
+      - redis_master_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a ${REDIS_PASSWORD} ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # =========================
+  # Redis Replica
+  # =========================
+  redis-replica-1:
+    image: redis:7-alpine
+    container_name: redis-replica-1
+    depends_on:
+      redis-master:
+        condition: service_healthy
+    command: >
+      redis-server
+      --port 6379
+      --appendonly yes
+      --bind 0.0.0.0
+      --protected-mode yes
+      --replicaof redis-master 6379
+      --masterauth ${REDIS_PASSWORD}
+      --requirepass ${REDIS_PASSWORD}
+    networks:
+      - redis-ha
+    volumes:
+      - redis_replica1_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a ${REDIS_PASSWORD} ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # =========================
+  # Redis Sentinel 1
+  # =========================
+  redis-sentinel-1:
+    image: redis:7-alpine
+    container_name: redis-sentinel-1
+    depends_on:
+      redis-master:
+        condition: service_healthy
+      redis-replica-1:
+        condition: service_started
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+    entrypoint: >
+      sh -c "
+      echo 'Waiting for redis-master...' &&
+      until ping -c 1 -W 1 redis-master; do echo 'waiting for redis-master...'; sleep 1; done &&
+      export MASTER_IP=$$(ping -c 1 redis-master | awk -F'[()]' '/PING/{print $$2}') &&
+      cp /tmp/sentinel.conf /tmp/sentinel-writable.conf &&
+      sed -i \"s/redis-master/$$MASTER_IP/g\" /tmp/sentinel-writable.conf &&
+      echo \"sentinel auth-pass mymaster ${REDIS_PASSWORD}\" >> /tmp/sentinel-writable.conf &&
+      redis-sentinel /tmp/sentinel-writable.conf
+      "
+    networks:
+      - redis-ha
+    ports:
+      - "26379:26379"
+    volumes:
+      - ./config/redis/sentinel.conf:/tmp/sentinel.conf:ro
+
+  # =========================
+  # Redis Sentinel 2
+  # =========================
+  redis-sentinel-2:
+    image: redis:7-alpine
+    container_name: redis-sentinel-2
+    depends_on:
+      redis-master:
+        condition: service_healthy
+      redis-replica-1:
+        condition: service_started
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+    entrypoint: >
+      sh -c "
+      echo 'Waiting for redis-master...' &&
+      until ping -c 1 -W 1 redis-master; do echo 'waiting for redis-master...'; sleep 1; done &&
+      export MASTER_IP=$$(ping -c 1 redis-master | awk -F'[()]' '/PING/{print $$2}') &&
+      cp /tmp/sentinel.conf /tmp/sentinel-writable.conf &&
+      sed -i \"s/redis-master/$$MASTER_IP/g\" /tmp/sentinel-writable.conf &&
+      echo \"sentinel auth-pass mymaster ${REDIS_PASSWORD}\" >> /tmp/sentinel-writable.conf &&
+      redis-sentinel /tmp/sentinel-writable.conf
+      "
+    networks:
+      - redis-ha
+    ports:
+      - "26380:26379"
+    volumes:
+      - ./config/redis/sentinel.conf:/tmp/sentinel.conf:ro
+
+  # =========================
+  # Redis Sentinel 3
+  # =========================
+  redis-sentinel-3:
+    image: redis:7-alpine
+    container_name: redis-sentinel-3
+    depends_on:
+      redis-master:
+        condition: service_healthy
+      redis-replica-1:
+        condition: service_started
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+    entrypoint: >
+      sh -c "
+      echo 'Waiting for redis-master...' &&
+      until ping -c 1 -W 1 redis-master; do echo 'waiting for redis-master...'; sleep 1; done &&
+      export MASTER_IP=$$(ping -c 1 redis-master | awk -F'[()]' '/PING/{print $$2}') &&
+      cp /tmp/sentinel.conf /tmp/sentinel-writable.conf &&
+      sed -i \"s/redis-master/$$MASTER_IP/g\" /tmp/sentinel-writable.conf &&
+      echo \"sentinel auth-pass mymaster ${REDIS_PASSWORD}\" >> /tmp/sentinel-writable.conf &&
+      redis-sentinel /tmp/sentinel-writable.conf
+      "
+    networks:
+      - redis-ha
+    ports:
+      - "26381:26379"
+    volumes:
+      - ./config/redis/sentinel.conf:/tmp/sentinel.conf:ro
+
+  # =========================
+  # Backend
+  # =========================
+  backend:
+    build: .
+    container_name: fiber-backend
+    ports:
+      - "5001:5001"
+    environment:
+      - STAGE_STATUS=dev
+      - SERVER_HOST=0.0.0.0
+      - SERVER_PORT=5001
+      - REDIS_MODE=sentinel
+      - REDIS_SENTINEL_MASTER_NAME=mymaster
+      - REDIS_SENTINEL_ADDRS=redis-sentinel-1:26379,redis-sentinel-2:26379,redis-sentinel-3:26379
+      - REDIS_PASSWORD=secret
+      - DB_TYPE=pgx
+      - DB_HOST=postgres-container
+      - DB_PORT=5432
+      - DB_USER=postgres
+      - DB_PASSWORD=123456
+      - DB_NAME=nexpay
+      - DB_SSL_MODE=disable
+      - DB_MAX_CONNECTIONS=100
+      - DB_MAX_IDLE_CONNECTIONS=10
+      - DB_MAX_LIFETIME_CONNECTIONS=2
+      - JWT_SECRET_KEY=secret
+    networks:
+      - redis-ha
+    depends_on:
+      redis-master:
+        condition: service_healthy
+      redis-replica-1:
+        condition: service_started
+      redis-sentinel-1:
+        condition: service_started
+      redis-sentinel-2:
+        condition: service_started
+      redis-sentinel-3:
+        condition: service_started
+      postgres-container:
+        condition: service_healthy
+volumes:
+  redis_master_data:
+  redis_replica1_data:
+
+networks:
+  redis-ha:
+    driver: bridge

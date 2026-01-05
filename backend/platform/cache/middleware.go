@@ -1,6 +1,7 @@
 package cache
 
 import (
+	"context"
 	"crypto/md5"
 	"fmt"
 	"strconv"
@@ -75,7 +76,7 @@ func NewMiddleware(config ...CacheConfig) fiber.Handler {
 
 	// Initialize cache service if not (khởi tạo cache service nếu chưa có)
 	if cfg.CacheService == nil {
-		cacheService, err := NewCacheService()
+		cacheService, err := NewCacheService(context.Background())
 		if err != nil {
 			panic(fmt.Sprintf("Failed to initialize cache service: %v", err))
 		}
@@ -213,7 +214,7 @@ func SessionMiddleware(config ...SessionConfig) fiber.Handler {
 	}
 
 	if cfg.CacheService == nil {
-		cacheService, err := NewCacheService()
+		cacheService, err := NewCacheService(context.Background())
 		if err != nil {
 			panic(fmt.Sprintf("Failed to initialize cache service: %v", err))
 		}
@@ -343,7 +344,7 @@ func RateLimitMiddleware(config ...RateLimitConfig) fiber.Handler {
 	}
 
 	if cfg.CacheService == nil {
-		cacheService, err := NewCacheService()
+		cacheService, err := NewCacheService(context.Background())
 		if err != nil {
 			panic(fmt.Sprintf("Failed to initialize cache service: %v", err))
 		}
