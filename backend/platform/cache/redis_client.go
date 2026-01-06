@@ -2,6 +2,8 @@ package cache
 
 import (
 	"context"
+	"fmt"
+	"os"
 	"strings"
 
 	"github.com/redis/go-redis/v9"
@@ -18,9 +20,40 @@ func (rc *RedisClient) Close() error {
 	return rc.Client.Close()
 }
 
-// NewRedisClient creates a new Redis client based on REDIS_MODE
+// NewRedisClient creates a new Redis client based on REDIS_MODE or auto-detection
 func NewRedisClient(ctx context.Context) (*RedisClient, error) {
-	client, err := newRedisSentinelClient(ctx)
+	var (
+		client *RedisClient
+		err    error
+	)
+
+	// Prefer explicit mode if provided, else auto-detect
+	mode := strings.ToLower(strings.TrimSpace(os.Getenv("REDIS_MODE")))
+
+	switch mode {
+	case "cluster":
+		client, err = newRedisClusterClient(ctx)
+	case "sentinel":
+		client, err = newRedisSentinelClient(ctx)
+	case "single", "standalone":
+		client, err = newRedisSingleClient(ctx)
+	case "", "auto":
+		// Auto-detect by presence of envs
+		switch {
+		case strings.TrimSpace(os.Getenv("REDIS_CLUSTER_ADDRS")) != "":
+			client, err = newRedisClusterClient(ctx)
+		case strings.TrimSpace(os.Getenv("REDIS_SENTINEL_MASTER_NAME")) != "" &&
+			strings.TrimSpace(os.Getenv("REDIS_SENTINEL_ADDRS")) != "":
+			client, err = newRedisSentinelClient(ctx)
+		case strings.TrimSpace(os.Getenv("REDIS_HOST")) != "" &&
+			strings.TrimSpace(os.Getenv("REDIS_PORT")) != "":
+			client, err = newRedisSingleClient(ctx)
+		default:
+			err = fmt.Errorf("redis configuration not found: set REDIS_MODE or required envs")
+		}
+	default:
+		err = fmt.Errorf("unsupported REDIS_MODE: %s", mode)
+	}
 
 	if err != nil {
 		return nil, err
