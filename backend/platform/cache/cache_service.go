@@ -16,15 +16,15 @@ type CacheService struct {
 }
 
 // NewCacheService creates a new cache service instance
-func NewCacheService() (*CacheService, error) {
-	client, err := NewRedisClient()
+func NewCacheService(ctx context.Context) (*CacheService, error) {
+	client, err := NewRedisClient(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	return &CacheService{
 		client: client,
-		ctx:    context.Background(),
+		ctx:    ctx,
 	}, nil
 }
 

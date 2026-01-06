@@ -25,15 +25,15 @@ type MessageQueue struct {
 }
 
 // NewMessageQueue creates a new message queue instance
-func NewMessageQueue() (*MessageQueue, error) {
-	client, err := NewRedisClient()
+func NewMessageQueue(ctx context.Context) (*MessageQueue, error) {
+	client, err := NewRedisClient(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	return &MessageQueue{
 		client: client,
-		ctx:    context.Background(),
+		ctx:    ctx,
 	}, nil
 }
 
@@ -200,15 +200,15 @@ type PubSub struct {
 }
 
 // NewPubSub creates a new pub/sub instance
-func NewPubSub() (*PubSub, error) {
-	client, err := NewRedisClient()
+func NewPubSub(ctx context.Context) (*PubSub, error) {
+	client, err := NewRedisClient(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	return &PubSub{
 		client:      client,
-		ctx:         context.Background(),
+		ctx:         ctx,
 		subscribers: make(map[string][]chan *redis.Message),
 	}, nil
 }
@@ -271,8 +271,8 @@ type Worker struct {
 }
 
 // NewWorker creates a new queue worker
-func NewWorker(queueName string, concurrency int) (*Worker, error) {
-	mq, err := NewMessageQueue()
+func NewWorker(ctx context.Context, queueName string, concurrency int) (*Worker, error) {
+	mq, err := NewMessageQueue(ctx)
 	if err != nil {
 		return nil, err
 	}

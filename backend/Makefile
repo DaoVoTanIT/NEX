@@ -36,7 +36,11 @@ migrate.down:
 migrate.force:
 	migrate -path $(MIGRATIONS_FOLDER) -database "$(DATABASE_URL)" force $(version)
 
-docker.run: docker.network docker.postgres swag docker.fiber docker.redis migrate.up
+docker.sentinel:
+	docker-compose -f docker-compose.redis-sentinel.yml up -d --build
+
+docker.stop.sentinel:
+	docker-compose -f docker-compose.redis-sentinel.yml down
 
 docker.network:
 	docker network inspect dev-network >/dev/null 2>&1 || \

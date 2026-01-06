@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"os"
 
 	"github.com/create-go-app/fiber-go-template/pkg/configs"
@@ -33,7 +34,8 @@ func main() {
 	// Define a new Fiber app with config.
 	app := fiber.New(config)
 
-	container, err := di.NewContainer()
+	ctx := context.Background()
+	container, err := di.NewContainer(ctx)
 	if err != nil {
 		panic(err)
 	}
@@ -43,6 +45,7 @@ func main() {
 
 	// Routes.
 	routes.SwaggerRoute(app) // Register a route for API Docs (Swagger).
+	routes.HealthRoute(app, container)
 	routes.PublicRoutes(app, container.AuthController, container.WalletController)
 	routes.PrivateRoutes(app, container.JWTMiddleware, container.AuthController, container.TokenController, container.WalletController)
 	routes.NotFoundRoute(app) // Register route for 404 Error.

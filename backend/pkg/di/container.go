@@ -1,6 +1,7 @@
 package di
 
 import (
+	"context"
 	"os"
 
 	"github.com/create-go-app/fiber-go-template/app/controllers"
@@ -29,13 +30,13 @@ type Container struct {
 	JWTMiddleware    func(*fiber.Ctx) error
 }
 
-func NewContainer() (*Container, error) {
+func NewContainer(ctx context.Context) (*Container, error) {
 	gormDB, err := database.OpenGORMDBConnection()
 	if err != nil {
 		return nil, err
 	}
 
-	cacheService, err := cache.NewCacheService()
+	cacheService, err := cache.NewCacheService(ctx)
 	if err != nil {
 		return nil, err
 	}
